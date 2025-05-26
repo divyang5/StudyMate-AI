@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.example.studymateai" />
+                  <option name="mobileSdkAppId" value="1:353165712029:android:363855818fa546e7f99274" />
+                  <option name="projectId" value="studymate-ai-6b142" />
+                  <option name="projectNumber" value="353165712029" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
