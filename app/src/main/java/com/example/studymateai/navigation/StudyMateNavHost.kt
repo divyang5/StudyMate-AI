@@ -12,6 +12,7 @@ import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.screen.LoginScreen
 import com.example.studymateai.ui.screen.SignUpScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
+import com.example.studymateai.ui.screen.main.ProfileScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
@@ -25,6 +26,7 @@ fun StudyMateNavHost(
     val auth: FirebaseAuth = Firebase.auth
     val context=LocalContext.current
     val sharedPref = remember { SharedPref(context) }
+
 
     NavHost(
         navController = navController,
@@ -72,15 +74,18 @@ fun StudyMateNavHost(
         }
 
         composable(Routes.Profile.route) {
-//            ProfileScreen(
-//                onLogout = {
-//                    auth.signOut()
-//                    sharedPref.clearUserSession()
-//                    navController.navigate(Routes.Login.route) {
-//                        popUpTo(0)
-//                    }
-//                }
-//            )
+            ProfileScreen(
+                onLogout = {
+                    auth.signOut()
+                    sharedPref.clearUserSession()
+                    navController.navigate(Routes.Login.route) {
+                        popUpTo(0)
+                    }
+                },
+                onPasswordChange = {},
+                onSettingsClick = {},
+                onPrivacyClick = {}
+            )
         }
 
         // Chapter Flow

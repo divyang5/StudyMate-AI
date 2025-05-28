@@ -70,9 +70,10 @@ fun LoginScreen(
         ) {
             // App Logo/Title
             Image(
-                painter = painterResource(id = R.drawable.ic_launcher_background),
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = "StudyMate AI Logo",
-                modifier = Modifier.height(48.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -121,11 +122,17 @@ fun LoginScreen(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.End
             ) {
-
-                TextButton(onClick = onForgotPasswordClick) {
-                    Text("Forgot Password?")
+                TextButton(
+                    onClick = onForgotPasswordClick,
+                    modifier = Modifier.padding(end = 4.dp) // Optional: Small right padding
+                ) {
+                    Text(
+                        text = "Forgot Password?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
 

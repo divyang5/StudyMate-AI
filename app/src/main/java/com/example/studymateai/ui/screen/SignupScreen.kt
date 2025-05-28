@@ -35,6 +35,9 @@ import androidx.compose.ui.unit.dp
 import com.example.studymateai.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 
@@ -44,10 +47,11 @@ fun SignUpScreen(
     onSignUpSuccess: () -> Unit,
     onLoginClick: () -> Unit,
 ) {
+    val firstNameState = remember { mutableStateOf("") }
+    val lastNameState = remember { mutableStateOf("") }
     val emailState = remember { mutableStateOf("") }
     val passwordState = remember { mutableStateOf("") }
     val confirmPasswordState = remember { mutableStateOf("") }
-    val rememberMeState = remember { mutableStateOf(false) }
     val passwordErrorState = remember { mutableStateOf<String?>(null) }
     val isLoading = remember { mutableStateOf(false) }
     val showSuccessDialog = remember { mutableStateOf(false) }
@@ -55,6 +59,7 @@ fun SignUpScreen(
     val errorMessage = remember { mutableStateOf("") }
 
     val auth: FirebaseAuth = Firebase.auth
+    val firestore = Firebase.firestore
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -69,9 +74,9 @@ fun SignUpScreen(
         ) {
             // App Logo/Title
             Image(
-                painter = painterResource(id = R.drawable.ic_launcher_background),
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = "StudyMate AI Logo",
-                modifier = Modifier.height(48.dp)
+                modifier = Modifier.size(120.dp)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -83,6 +88,32 @@ fun SignUpScreen(
             )
 
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Name Fields
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = firstNameState.value,
+                    onValueChange = { firstNameState.value = it },
+                    label = { Text("First Name") },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = lastNameState.value,
+                    onValueChange = { lastNameState.value = it },
+                    label = { Text("Last Name") },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Email Field
             OutlinedTextField(
@@ -133,6 +164,12 @@ fun SignUpScreen(
             // Sign Up Button
             Button(
                 onClick = {
+                    if (firstNameState.value.isEmpty() || lastNameState.value.isEmpty()) {
+                        errorMessage.value = "Please enter your name"
+                        showErrorDialog.value = true
+                        return@Button
+                    }
+
                     val error = validatePassword(passwordState.value, confirmPasswordState.value)
                     passwordErrorState.value = error
                     if (error == null) {
@@ -141,6 +178,8 @@ fun SignUpScreen(
                             auth = auth,
                             email = emailState.value,
                             password = passwordState.value,
+                            firstName = firstNameState.value,
+                            lastName = lastNameState.value,
                             onSuccess = {
                                 isLoading.value = false
                                 showSuccessDialog.value = true
@@ -149,7 +188,8 @@ fun SignUpScreen(
                                 isLoading.value = false
                                 errorMessage.value = message
                                 showErrorDialog.value = true
-                            }
+                            },
+                            firestore = firestore
                         )
                     }
                 },
@@ -221,13 +261,33 @@ fun SignUpScreen(
     }
 }
 
+// Updated Firebase functions
 private suspend fun createUserWithFirebase(
     auth: FirebaseAuth,
+    firestore: FirebaseFirestore,
     email: String,
-    password: String
+    password: String,
+    firstName: String,
+    lastName: String
 ): Result<Unit> {
     return try {
-        auth.createUserWithEmailAndPassword(email, password).await()
+        // 1. Create auth user
+        val authResult = auth.createUserWithEmailAndPassword(email, password).await()
+
+        // 2. Create user document in Firestore
+        val user = hashMapOf(
+            "uid" to authResult.user?.uid,
+            "firstName" to firstName,
+            "lastName" to lastName,
+            "email" to email,
+            "createdAt" to FieldValue.serverTimestamp()
+        )
+
+        firestore.collection("users")
+            .document(authResult.user?.uid ?: "")
+            .set(user)
+            .await()
+
         Result.success(Unit)
     } catch (e: Exception) {
         Result.failure(e)
@@ -236,17 +296,33 @@ private suspend fun createUserWithFirebase(
 
 private fun createUserWithEmailAndPassword(
     auth: FirebaseAuth,
+    firestore: FirebaseFirestore,
     email: String,
     password: String,
+    firstName: String,
+    lastName: String,
     onSuccess: () -> Unit,
     onError: (String) -> Unit
 ) {
     auth.createUserWithEmailAndPassword(email, password)
-        .addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                onSuccess()
+        .addOnCompleteListener { authTask ->
+            if (authTask.isSuccessful) {
+                // Create user document in Firestore
+                val user = hashMapOf(
+                    "uid" to authTask.result.user?.uid,
+                    "firstName" to firstName,
+                    "lastName" to lastName,
+                    "email" to email,
+                    "createdAt" to FieldValue.serverTimestamp()
+                )
+
+                firestore.collection("users")
+                    .document(authTask.result.user?.uid ?: "")
+                    .set(user)
+                    .addOnSuccessListener { onSuccess() }
+                    .addOnFailureListener { e -> onError(e.message ?: "Failed to create user profile") }
             } else {
-                onError(task.exception?.message ?: "Unknown error occurred")
+                onError(authTask.exception?.message ?: "Unknown error occurred")
             }
         }
 }
