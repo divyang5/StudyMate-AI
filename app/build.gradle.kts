@@ -79,10 +79,32 @@ dependencies {
 
 
     implementation(libs.androidx.navigation.compose)
-
+    implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0-alpha01")
 
     // hilt
      implementation("com.google.dagger:hilt-android:2.48")
      kapt("com.google.dagger:hilt-android-compiler:2.48")
      implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+
+
+    implementation("com.google.accompanist:accompanist-permissions:0.37.3")
+
+    // ML Kit for text recognition
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.4.0")
+
+
+    // CameraX
+
+    implementation("androidx.camera:camera-core:1.3.0")
+    implementation("androidx.camera:camera-camera2:1.3.0")
+    implementation("androidx.camera:camera-lifecycle:1.3.0")
+    implementation("androidx.camera:camera-view:1.3.0")
+
+    implementation("com.google.android.gms:play-services-base:18.2.0")
+    implementation("com.google.android.gms:play-services-basement:18.2.0")
+
+
 }

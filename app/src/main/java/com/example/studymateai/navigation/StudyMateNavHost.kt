@@ -5,12 +5,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.screen.LoginScreen
 import com.example.studymateai.ui.screen.SignUpScreen
+import com.example.studymateai.ui.screen.chapter.ScanScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
 import com.example.studymateai.ui.screen.main.ProfileScreen
 import com.google.firebase.auth.FirebaseAuth
@@ -88,10 +91,18 @@ fun StudyMateNavHost(
             )
         }
 
-        // Chapter Flow
-        composable(Routes.Scan.route) { backStackEntry ->
+
+        composable(
+            route = Routes.Scan.route,
+            arguments = listOf(
+                navArgument(Routes.Scan.ARG_FROM_CAMERA) {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { backStackEntry ->
             val fromCamera = backStackEntry.arguments?.getBoolean(Routes.Scan.ARG_FROM_CAMERA) ?: false
-//            ScanScreen(fromCamera, navController)
+            ScanScreen(fromCamera = fromCamera, navController = navController)
         }
 
         composable(Routes.ChapterView.route) { backStackEntry ->

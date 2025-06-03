@@ -1,6 +1,8 @@
 package com.example.studymateai.ui.screen.main
 
+import android.Manifest
 import android.content.Context
+import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -34,13 +39,16 @@ import androidx.navigation.NavController
 import com.example.studymateai.navigation.Routes
 import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.components.BottomNavigationBar
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import com.google.firebase.Firebase
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.tasks.await
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun HomeScreen(
     navController: NavController,
@@ -63,8 +71,23 @@ fun HomeScreen(
     val isLoading = remember { mutableStateOf(true) }
 
 
+    // Permission states
+    val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
+    val galleryPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    val galleryPermissionState = rememberPermissionState(galleryPermission)
+
+    val showPermissionDialog = remember { mutableStateOf(false) }
+
+
     // Fetch user data when screen loads
     LaunchedEffect(Unit) {
+        if (!cameraPermissionState.status.isGranted || !galleryPermissionState.status.isGranted) {
+            showPermissionDialog.value = true
+        }
         val userId = auth.currentUser?.uid ?: return@LaunchedEffect
         try {
             val document = firestore.collection("users").document(userId).get().await()
@@ -92,6 +115,28 @@ fun HomeScreen(
         }
     }
 
+    // Show permission dialog if needed
+    if (showPermissionDialog.value) {
+        PermissionDialog(
+            onDismiss = { showPermissionDialog.value = false },
+            onConfirm = {
+                cameraPermissionState.launchPermissionRequest()
+                galleryPermissionState.launchPermissionRequest()
+            }
+        )
+    }
+
+    if (cameraPermissionState.status.isGranted && galleryPermissionState.status.isGranted) {
+        // Your actual scan screen content
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Scan Document Screen")
+            // Implement your camera/gallery scanning here
+        }
+    }
     Scaffold(
         bottomBar = { BottomNavigationBar(navController) }
     ) { padding ->
@@ -176,4 +221,29 @@ fun QuickActionCard(text: String, onClick: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+fun PermissionDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Permissions Needed") },
+        text = { Text("StudyMate AI needs camera and gallery permissions to scan documents") },
+        confirmButton = {
+            Button(onClick = {
+                onConfirm()
+                onDismiss()
+            }) {
+                Text("Allow")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Not Now")
+            }
+        }
+    )
 }
