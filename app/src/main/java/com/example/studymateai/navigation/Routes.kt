@@ -1,5 +1,7 @@
 package com.example.studymateai.navigation
 
+import java.net.URLEncoder
+
 sealed class Routes(val route: String) {
     object Login : Routes("login")
     object SignUp : Routes("signup")
@@ -11,10 +13,16 @@ sealed class Routes(val route: String) {
     object History : Routes("history")
     object Profile : Routes("profile")
 
+
     // Chapter Flow
     object Scan : Routes("scan") {
         const val ARG_FROM_CAMERA = "fromCamera"
         fun createRoute(fromCamera: Boolean) = "scan?$ARG_FROM_CAMERA=$fromCamera"
+    }
+
+    object TextEdit : Routes("textedit/{extractedText}") {
+        const val EXTRACTED_TEXT = "extractedText"
+        fun createRoute(extractedText: String) = "textedit/${URLEncoder.encode(extractedText, "UTF-8")}"
     }
 
     object ChapterView : Routes("chapter/{id}") {

@@ -53,12 +53,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.rememberImagePainter
+import com.example.studymateai.navigation.Routes
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -176,18 +178,18 @@ fun ScanScreen(
                             CameraScanner(
                                 onTextDetected = { text ->
                                     extractedText.value = text
-                                    showCameraScanner.value = false
+//                                    showCameraScanner.value = false
+                                    val encodedText = URLEncoder.encode(text, "UTF-8")
+                                    navController.navigate(Routes.TextEdit.createRoute(encodedText)) {
+                                        popUpTo(Routes.Scan.route) { inclusive = true }
+                                    }
 //                                    navController.navigate("textPreview/$text")
                                 },
                                 onError = { e ->
                                     errorMessage.value = e.message
+                                    Log.e("ScanScreen", "Text recognition failed" + e.message, e)
                                 }
                             )
-
-                            errorMessage?.let {
-                                Text("Error: $it", color = Color.Red)
-                            }
-
 
                             // Close button for camera view
                             IconButton(
@@ -197,6 +199,11 @@ fun ScanScreen(
                                     .padding(16.dp)
                             ) {
                                 Icon(Icons.Default.Close, contentDescription = "Close camera")
+                            }
+
+                            errorMessage.value?.let { error ->
+                                Text("Error: $error", color = Color.Red)
+                                Log.e("ScanScreen", "Text recognition failed" + error)
                             }
                         }
                     }
@@ -219,7 +226,7 @@ fun ScanScreen(
                     }
                     else -> {
 //                        if (fromCamera) {
-//                            cameraLauncher.launch(null)
+
 //                        } else {
 //                            galleryLauncher.launch("image/*")
 //                        }

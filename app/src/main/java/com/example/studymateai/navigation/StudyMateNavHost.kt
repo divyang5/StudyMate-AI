@@ -14,11 +14,13 @@ import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.screen.LoginScreen
 import com.example.studymateai.ui.screen.SignUpScreen
 import com.example.studymateai.ui.screen.chapter.ScanScreen
+import com.example.studymateai.ui.screen.chapter.TextEditorScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
 import com.example.studymateai.ui.screen.main.ProfileScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import java.net.URLDecoder
 
 @Composable
 fun StudyMateNavHost(
@@ -117,5 +119,25 @@ fun StudyMateNavHost(
         }
 
         // Add similar composable entries for Summary and Flashcards
+        composable(
+            route = Routes.TextEdit.route,
+            arguments = listOf(
+                navArgument(Routes.TextEdit.EXTRACTED_TEXT) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val encodedText = backStackEntry.arguments?.getString(Routes.TextEdit.EXTRACTED_TEXT) ?: ""
+            val extractedText = try {
+                URLDecoder.decode(encodedText, "UTF-8")
+            } catch (e: Exception) {
+                ""
+            }
+
+            TextEditorScreen(
+                extractedText = extractedText,
+                navController = navController
+            )
+        }
     }
 }
