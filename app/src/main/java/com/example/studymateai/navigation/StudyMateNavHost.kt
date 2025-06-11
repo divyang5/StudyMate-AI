@@ -13,6 +13,7 @@ import androidx.navigation.navArgument
 import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.screen.LoginScreen
 import com.example.studymateai.ui.screen.SignUpScreen
+import com.example.studymateai.ui.screen.chapter.ChapterDetailScreen
 import com.example.studymateai.ui.screen.chapter.ScanScreen
 import com.example.studymateai.ui.screen.chapter.TextEditorScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
@@ -138,6 +139,18 @@ fun StudyMateNavHost(
                 extractedText = extractedText,
                 navController = navController
             )
+        }
+
+        composable(
+            route = Routes.ChapterDetail.route,
+            arguments = listOf(
+                navArgument(Routes.ChapterDetail.CHAPTER_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val chapterId = backStackEntry.arguments?.getString(Routes.ChapterDetail.CHAPTER_ID) ?: ""
+            ChapterDetailScreen(navController, chapterId)
         }
     }
 }
