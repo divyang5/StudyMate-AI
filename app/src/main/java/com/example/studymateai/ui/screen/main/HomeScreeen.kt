@@ -3,13 +3,16 @@ package com.example.studymateai.ui.screen.main
 import android.Manifest
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,9 +39,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.studymateai.data.model.chapters.Chapter
 import com.example.studymateai.navigation.Routes
 import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.components.BottomNavigationBar
+import com.example.studymateai.ui.components.ChapterCard
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -47,6 +52,7 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.tasks.await
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -69,7 +75,8 @@ fun HomeScreen(
     val firstName = remember { mutableStateOf("") }
     val lastName = remember { mutableStateOf("") }
     val isLoading = remember { mutableStateOf(true) }
-
+    val chapters = remember { mutableStateOf<List<Chapter>>(emptyList()) }
+    val isChaptersLoading = remember { mutableStateOf(false) }
 
     // Permission states
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
@@ -113,9 +120,34 @@ fun HomeScreen(
             isLoading.value = false
             // Handle error
         }
+
+        isChaptersLoading.value = true
+        try {
+            val userId = auth.currentUser?.uid ?: return@LaunchedEffect
+            val querySnapshot = firestore.collection("chapters")
+                .whereEqualTo("userId", userId)
+//                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(5)
+                .get()
+                .await()
+
+            val chaptersList = querySnapshot.documents.map { doc ->
+                Chapter(
+                    id = doc.id,
+                    title = doc.getString("title") ?: "",
+                    description = doc.getString("description") ?: "",
+                    content = doc.getString("content") ?: "",
+                    createdAt = doc.getDate("createdAt") ?: Date()
+                )
+            }
+            chapters.value = chaptersList
+        } catch (e: Exception) {
+            Log.e("HomeScreen", "Error fetching chapters", e)
+        } finally {
+            isChaptersLoading.value = false
+        }
     }
 
-    // Show permission dialog if needed
     if (showPermissionDialog.value) {
         PermissionDialog(
             onDismiss = { showPermissionDialog.value = false },
@@ -127,14 +159,12 @@ fun HomeScreen(
     }
 
     if (cameraPermissionState.status.isGranted && galleryPermissionState.status.isGranted) {
-        // Your actual scan screen content
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("Scan Document Screen")
-            // Implement your camera/gallery scanning here
         }
     }
     Scaffold(
@@ -183,6 +213,33 @@ fun HomeScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+
+                if (isChaptersLoading.value) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                } else {
+                    if (chapters.value.isEmpty()) {
+                        Text(
+                            text = "No chapters found",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(chapters.value) { chapter ->
+                                ChapterCard(
+                                    chapter = chapter,
+                                    onClick = {
+//                                        navController.navigate(" ")
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
