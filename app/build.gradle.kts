@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,11 +7,13 @@ plugins {
     id("com.google.gms.google-services")
      id("kotlin-kapt")
      id("com.google.dagger.hilt.android")
+
 }
 
 android {
     namespace = "com.example.studymateai"
     compileSdk = 35
+
 
     defaultConfig {
         applicationId = "com.example.studymateai"
@@ -17,11 +21,20 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val localProperties = Properties().apply {
+            load(rootProject.file("local.properties").inputStream())
+        }
+
+        buildConfigField(
+            "String",
+            "GEMINI_API_KEY",
+            "\"${localProperties.getProperty("GEMINI_API_KEY")}\""
+        )
     }
 
     buildTypes {
@@ -42,6 +55,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.3"
@@ -105,6 +119,13 @@ dependencies {
 
     implementation("com.google.android.gms:play-services-base:18.2.0")
     implementation("com.google.android.gms:play-services-basement:18.2.0")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+    //generative ai
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+
+
+    implementation("com.google.code.gson:gson:2.10.1")
 
 
 }

@@ -83,7 +83,7 @@ fun ChapterDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        navController.navigate("editChapter/${chapterId}")
+//                        navController.navigate("editChapter/${chapterId}")
                     }) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit")
                     }
@@ -103,12 +103,12 @@ fun ChapterDetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState()) // Outer scrolling
+                    .verticalScroll(rememberScrollState())
                     .padding(padding)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Content Card with fixed height and internal scrolling
+
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
@@ -120,7 +120,7 @@ fun ChapterDetailScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .verticalScroll(rememberScrollState()) // Internal scrolling
+                            .verticalScroll(rememberScrollState())
                             .padding(16.dp)
                     ) {
                         Column(
@@ -148,7 +148,11 @@ fun ChapterDetailScreen(
                     ActionButton(
                         iconResId = R.drawable.quizz,
                         text = "Make Quiz",
-                        onClick = { navController.navigate(Routes.QuizGen.createRoute(chapterId)) }
+                        onClick = {
+                            navController.navigate(
+                                Routes.QuizGen.createRoute(chapterId = chapterId)
+                            )
+                        }
                     )
 
                     ActionButton(
@@ -170,7 +174,7 @@ fun ChapterDetailScreen(
 
 @Composable
 fun ActionButton(
-    iconResId: Int,  // Changed from ImageVector to resource ID
+    iconResId: Int,
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier

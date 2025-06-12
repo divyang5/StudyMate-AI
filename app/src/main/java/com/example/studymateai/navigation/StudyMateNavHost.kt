@@ -18,6 +18,7 @@ import com.example.studymateai.ui.screen.chapter.ScanScreen
 import com.example.studymateai.ui.screen.chapter.TextEditorScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
 import com.example.studymateai.ui.screen.main.ProfileScreen
+import com.example.studymateai.ui.screen.quizz.QuizGenerationScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
@@ -113,11 +114,6 @@ fun StudyMateNavHost(
 //            ChapterViewScreen(chapterId, navController)
         }
 
-        // Generation Screens
-        composable(Routes.QuizGen.route) { backStackEntry ->
-            val chapterId = backStackEntry.arguments?.getString(Routes.QuizGen.ARG_CHAPTER_ID) ?: ""
-//            QuizGenerationScreen(chapterId, navController)
-        }
 
         // Add similar composable entries for Summary and Flashcards
         composable(
@@ -151,6 +147,23 @@ fun StudyMateNavHost(
         ) { backStackEntry ->
             val chapterId = backStackEntry.arguments?.getString(Routes.ChapterDetail.CHAPTER_ID) ?: ""
             ChapterDetailScreen(navController, chapterId)
+        }
+
+
+
+        composable(
+            route = Routes.QuizGen.route,
+            arguments = listOf(
+                navArgument(Routes.QuizGen.CHAPTER_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val chapterId = backStackEntry.arguments?.getString(Routes.QuizGen.CHAPTER_ID) ?: ""
+            QuizGenerationScreen(
+                navController = navController,
+                chapterId = chapterId
+            )
         }
     }
 }

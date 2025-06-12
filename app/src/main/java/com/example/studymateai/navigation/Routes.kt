@@ -37,7 +37,7 @@ sealed class Routes(val route: String) {
 
     // Generation Screens
     object QuizGen : Routes("quiz/{chapterId}") {
-        const val ARG_CHAPTER_ID = "chapterId"
+        const val CHAPTER_ID = "chapterId"
         fun createRoute(chapterId: String) = "quiz/$chapterId"
     }
 
