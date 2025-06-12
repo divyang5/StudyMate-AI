@@ -9,15 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -34,11 +33,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.studymateai.R
 import com.example.studymateai.data.model.chapters.Chapter
+import com.example.studymateai.navigation.Routes
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.tasks.await
@@ -139,27 +140,27 @@ fun ChapterDetailScreen(
                     }
                 }
 
-                // Action Buttons
+
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     ActionButton(
-                        icon = Icons.Default.Add,
+                        iconResId = R.drawable.quizz,
                         text = "Make Quiz",
-                        onClick = { navController.navigate("quizGen/${chapterId}") }
+                        onClick = { navController.navigate(Routes.QuizGen.createRoute(chapterId)) }
                     )
 
                     ActionButton(
-                        icon = Icons.Default.Add,
+                        iconResId = R.drawable.library,
                         text = "Generate Summary",
-                        onClick = { navController.navigate("summaryGen/${chapterId}") }
+                        onClick = { navController.navigate(Routes.Summary.createRoute(chapterId)) }
                     )
 
                     ActionButton(
-                        icon = Icons.Default.Add,
+                        iconResId = R.drawable.flashcard,
                         text = "Create Flashcards",
-                        onClick = { navController.navigate("flashcardsGen/${chapterId}") }
+                        onClick = { navController.navigate(Routes.Flashcards.createRoute(chapterId)) }
                     )
                 }
             }
@@ -169,7 +170,7 @@ fun ChapterDetailScreen(
 
 @Composable
 fun ActionButton(
-    icon: ImageVector,
+    iconResId: Int,  // Changed from ImageVector to resource ID
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -177,17 +178,17 @@ fun ActionButton(
     Button(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(icon, contentDescription = text)
+            Icon(
+                painter = painterResource(id = iconResId),
+                contentDescription = text,
+                modifier = Modifier.size(24.dp) // Adjust size as needed
+            )
             Text(text, style = MaterialTheme.typography.labelLarge)
         }
     }

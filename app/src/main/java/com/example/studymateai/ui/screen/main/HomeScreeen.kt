@@ -232,7 +232,7 @@ fun HomeScreen(
                                 ChapterCard(
                                     chapter = chapter,
                                     onClick = {
-//                                        navController.navigate(" ")
+                                        navController.navigate(Routes.ChapterDetail.createRoute(chapter.id))
                                     },
                                     modifier = Modifier.fillMaxWidth()
                                 )
