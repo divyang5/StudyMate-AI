@@ -29,7 +29,10 @@ jobs:
       - name: Set up Node.js for Firebase
         uses: actions/setup-node@v3
         with:
-          node-version: '20'  # Use compatible Node.js version
+          node-version: '20.11.1'
+
+      - name: Check Node.js Version
+        run: node -v
 
       - name: Install Firebase Tools
         run: npm install -g firebase-tools
