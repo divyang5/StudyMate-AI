@@ -19,6 +19,7 @@ import com.example.studymateai.ui.screen.chapter.TextEditorScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
 import com.example.studymateai.ui.screen.main.ProfileScreen
 import com.example.studymateai.ui.screen.quizz.QuizGenerationScreen
+import com.example.studymateai.ui.screen.summary.SummaryScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
@@ -161,6 +162,21 @@ fun StudyMateNavHost(
         ) { backStackEntry ->
             val chapterId = backStackEntry.arguments?.getString(Routes.QuizGen.CHAPTER_ID) ?: ""
             QuizGenerationScreen(
+                navController = navController,
+                chapterId = chapterId
+            )
+        }
+
+        composable(
+            route = Routes.Summary.route,
+            arguments = listOf(
+                navArgument(Routes.Summary.CHAPTER_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val chapterId = backStackEntry.arguments?.getString(Routes.Summary.CHAPTER_ID) ?: ""
+            SummaryScreen(
                 navController = navController,
                 chapterId = chapterId
             )
