@@ -13,10 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Set up Gemini API key
       - name: Set up Gemini Key
         run: |
-            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> local.properties
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> local.properties
 
+      # Set up Java
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
@@ -24,14 +26,41 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      # Auto-increment version code (using Unix timestamp)
+      - name: Generate Version Code
+        id: version
+        run: |
+          TIMESTAMP=$(date +%s)
+          echo "versionCode=$((TIMESTAMP / 60))" >> $GITHUB_OUTPUT
+          echo "versionName=1.0.$((TIMESTAMP / 3600))" >> $GITHUB_OUTPUT
+
+      # Update build.gradle with new version
+      - name: Update App Version
+        run: |
+          sed -i "s/versionCode .*/versionCode ${{ steps.version.outputs.versionCode }}/" app/build.gradle
+          sed -i "s/versionName .*/versionName \"${{ steps.version.outputs.versionName }}\"/" app/build.gradle
+          cat app/build.gradle | grep version
+
+      # Build with new version
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
-      - name: Set up Node.js 20.x
+      # Verify APK exists
+      - name: Verify APK
+        run: |
+          ls -la app/build/outputs/apk/debug/
+          if [ ! -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+            echo "::error::APK not found!"
+            exit 1
+          fi
+
+      # Set up Node.js for Firebase
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
+      # Upload to Firebase with release notes
       - name: Upload to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
@@ -39,5 +68,9 @@ jobs:
           serviceCredentialsFileContent: ${{ secrets.CREDENTIAL_FILE_CONTENT }}
           groups: testers
           file: app/build/outputs/apk/debug/app-debug.apk
-          # Add this to bypass Docker issues:
           skipDependencies: true
+          releaseNotes: |
+            Auto-generated build
+            Version: ${{ steps.version.outputs.versionName }}
+            Build: ${{ steps.version.outputs.versionCode }}
+            Date: $(date +'%Y-%m-%d %H:%M:%S')
