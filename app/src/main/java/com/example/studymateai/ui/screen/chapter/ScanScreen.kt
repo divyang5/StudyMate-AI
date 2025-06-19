@@ -40,7 +40,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -96,8 +95,21 @@ fun ScanScreen(
         uri?.let {
             selectedImageUri.value = it
             isLoading.value = true
-            // Process selected image
-            processUriForText(context, it, extractedText, isLoading, showError)
+            // Process selected image and navigate after extraction
+            processUriForText(
+                context = context,
+                uri = it,
+                onTextExtracted = { text ->
+                    val encodedText = URLEncoder.encode(text, "UTF-8")
+                    navController.navigate(Routes.TextEdit.createRoute(encodedText)) {
+                        popUpTo(Routes.Scan.route) { inclusive = true }
+                    }
+                },
+                onError = {
+                    isLoading.value = false
+                    showError.value = true
+                }
+            )
         }
     }
 
@@ -212,25 +224,6 @@ fun ScanScreen(
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
                         }
-                    }
-                    extractedText.value.isNotEmpty() -> {
-                        ScannedTextContent(
-                            text = extractedText.value,
-                            onRescan = { showSourceSelector.value = true }
-                        )
-                    }
-                    selectedImageUri.value != null -> {
-                        ImagePreview(
-                            uri = selectedImageUri.value!!,
-                            onRescan = { showSourceSelector.value = true }
-                        )
-                    }
-                    else -> {
-//                        if (fromCamera) {
-
-//                        } else {
-//                            galleryLauncher.launch("image/*")
-//                        }
                     }
                 }
             }
@@ -414,35 +407,12 @@ fun PermissionDeniedDialog(
     )
 }
 
-// Text recognition function (using ML Kit)
-private fun processImageForText(
-    context: Context,
-    bitmap: Bitmap,
-    extractedText: MutableState<String>,
-    isLoading: MutableState<Boolean>,
-    showError: MutableState<Boolean>
-) {
-    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-    val inputImage = InputImage.fromBitmap(bitmap, 0)
-
-    recognizer.process(inputImage)
-        .addOnSuccessListener { visionText ->
-            extractedText.value = visionText.text
-            isLoading.value = false
-        }
-        .addOnFailureListener { e ->
-            isLoading.value = false
-            showError.value = true
-            Log.e("ScanScreen", "Text recognition failed", e)
-        }
-}
-
+// Updated text processing functions
 private fun processUriForText(
     context: Context,
     uri: Uri,
-    extractedText: MutableState<String>,
-    isLoading: MutableState<Boolean>,
-    showError: MutableState<Boolean>
+    onTextExtracted: (String) -> Unit,
+    onError: () -> Unit
 ) {
     try {
         val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -450,10 +420,28 @@ private fun processUriForText(
         } else {
             MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
         }
-        processImageForText(context, bitmap, extractedText, isLoading, showError)
+        processImageForText(context, bitmap, onTextExtracted, onError)
     } catch (e: Exception) {
-        isLoading.value = false
-        showError.value = true
+        onError()
         Log.e("ScanScreen", "Image loading failed", e)
     }
+}
+
+private fun processImageForText(
+    context: Context,
+    bitmap: Bitmap,
+    onTextExtracted: (String) -> Unit,
+    onError: () -> Unit
+) {
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    val inputImage = InputImage.fromBitmap(bitmap, 0)
+
+    recognizer.process(inputImage)
+        .addOnSuccessListener { visionText ->
+            onTextExtracted(visionText.text)
+        }
+        .addOnFailureListener { e ->
+            onError()
+            Log.e("ScanScreen", "Text recognition failed", e)
+        }
 }

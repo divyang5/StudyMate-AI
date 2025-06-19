@@ -93,6 +93,9 @@ dependencies {
 
 
     implementation(libs.androidx.navigation.compose)
+
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0-alpha01")
 
     // hilt

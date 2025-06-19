@@ -17,6 +17,7 @@ import com.example.studymateai.ui.screen.chapter.ChapterDetailScreen
 import com.example.studymateai.ui.screen.chapter.ScanScreen
 import com.example.studymateai.ui.screen.chapter.TextEditorScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
+import com.example.studymateai.ui.screen.main.LibraryScreen
 import com.example.studymateai.ui.screen.main.ProfileScreen
 import com.example.studymateai.ui.screen.quizz.QuizGenerationScreen
 import com.example.studymateai.ui.screen.summary.SummaryScreen
@@ -74,7 +75,7 @@ fun StudyMateNavHost(
         }
 
         composable(Routes.Library.route) {
-//            LibraryScreen(navController)
+            LibraryScreen(navController)
         }
 
         composable(Routes.History.route) {
@@ -116,7 +117,7 @@ fun StudyMateNavHost(
         }
 
 
-        // Add similar composable entries for Summary and Flashcards
+
         composable(
             route = Routes.TextEdit.route,
             arguments = listOf(

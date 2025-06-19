@@ -52,7 +52,6 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.tasks.await
-import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -114,11 +113,12 @@ fun HomeScreen(
                 .setDisplayName("$userFirstName $userLastName")
                 .build()
             auth.currentUser?.updateProfile(userProfileChangeRequest)
+            Log.d("HomeScreen", "User" + userFirstName + userLastName  )
 
             isLoading.value = false
         } catch (e: Exception) {
             isLoading.value = false
-            // Handle error
+            Log.e("HomeScreen", "Error fetching User", e)
         }
 
         isChaptersLoading.value = true
@@ -131,15 +131,19 @@ fun HomeScreen(
                 .get()
                 .await()
 
-            val chaptersList = querySnapshot.documents.map { doc ->
-                Chapter(
-                    id = doc.id,
-                    title = doc.getString("title") ?: "",
-                    description = doc.getString("description") ?: "",
-                    content = doc.getString("content") ?: "",
-                    createdAt = doc.getDate("createdAt") ?: Date()
-                )
-            }
+            val chaptersList = querySnapshot.documents
+                .mapNotNull { doc ->
+                    doc.getDate("createdAt")?.let { date ->
+                        Chapter(
+                            id = doc.id,
+                            title = doc.getString("title") ?: "",
+                            description = doc.getString("description") ?: "",
+                            content = doc.getString("content") ?: "",
+                            createdAt = date
+                        )
+                    }
+                }
+                .sortedByDescending { it.createdAt }
             chapters.value = chaptersList
         } catch (e: Exception) {
             Log.e("HomeScreen", "Error fetching chapters", e)
