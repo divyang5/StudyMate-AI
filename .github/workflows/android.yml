@@ -26,7 +26,7 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # Auto-increment version code (using Unix timestamp)
+
       - name: Generate Version Code
         id: version
         run: |
@@ -34,12 +34,17 @@ jobs:
           echo "versionCode=$((TIMESTAMP / 60))" >> $GITHUB_OUTPUT
           echo "versionName=1.0.$((TIMESTAMP / 3600))" >> $GITHUB_OUTPUT
 
-      # Update build.gradle with new version
       - name: Update App Version
         run: |
-          sed -i "s/versionCode .*/versionCode ${{ steps.version.outputs.versionCode }}/" app/build.gradle
-          sed -i "s/versionName .*/versionName \"${{ steps.version.outputs.versionName }}\"/" app/build.gradle
-          cat app/build.gradle | grep version
+          GRADLE_FILE="./app/build.gradle"
+          if [ ! -f "$GRADLE_FILE" ]; then
+          echo "::error::build.gradle not found at $GRADLE_FILE"
+          ls -R # Debug directory structure
+          exit 1
+          fi
+    
+          sed -i "s/versionCode .*/versionCode ${{ steps.version.outputs.versionCode }}/" "$GRADLE_FILE"
+          sed -i "s/versionName .*/versionName \"${{ steps.version.outputs.versionName }}\"/" "$GRADLE_FILE"
 
       # Build with new version
       - name: Build debug APK
