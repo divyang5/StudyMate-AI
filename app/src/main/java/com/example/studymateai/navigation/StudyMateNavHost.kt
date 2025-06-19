@@ -16,10 +16,12 @@ import com.example.studymateai.ui.screen.SignUpScreen
 import com.example.studymateai.ui.screen.chapter.ChapterDetailScreen
 import com.example.studymateai.ui.screen.chapter.ScanScreen
 import com.example.studymateai.ui.screen.chapter.TextEditorScreen
+import com.example.studymateai.ui.screen.main.HistoryScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
 import com.example.studymateai.ui.screen.main.LibraryScreen
 import com.example.studymateai.ui.screen.main.ProfileScreen
 import com.example.studymateai.ui.screen.quizz.QuizGenerationScreen
+import com.example.studymateai.ui.screen.quizz.QuizHistoryDetailScreen
 import com.example.studymateai.ui.screen.summary.SummaryScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
@@ -79,7 +81,7 @@ fun StudyMateNavHost(
         }
 
         composable(Routes.History.route) {
-//            HistoryScreen(navController)
+            HistoryScreen(navController)
         }
 
         composable(Routes.Profile.route) {
@@ -182,5 +184,21 @@ fun StudyMateNavHost(
                 chapterId = chapterId
             )
         }
+
+        composable(
+            route = Routes.QuizHistoryDetail.route,
+            arguments = listOf(
+                navArgument(Routes.QuizHistoryDetail.QUIZ_HISTORY_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val quizId = backStackEntry.arguments?.getString(Routes.QuizHistoryDetail.QUIZ_HISTORY_ID) ?: ""
+            QuizHistoryDetailScreen(
+                navController = navController,
+                quizHistoryId = quizId
+            )
+        }
+
     }
 }

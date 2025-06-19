@@ -61,9 +61,9 @@ fun HomeScreen(
 ) {
     val quickActions = listOf(
         "Scan Document",
-        "Create Quiz",
-        "Make Flashcards",
-        "Generate Summary"
+//        "Create Quiz",
+//        "Make Flashcards",
+//        "Generate Summary"
     )
 
     val auth = Firebase.auth

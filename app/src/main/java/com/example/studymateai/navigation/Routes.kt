@@ -51,6 +51,11 @@ sealed class Routes(val route: String) {
         fun createRoute(chapterId: String) = "flashcards/$chapterId"
     }
 
+    object QuizHistoryDetail : Routes("quizHistory/{quizHistoryId}") {
+        const val QUIZ_HISTORY_ID = "quizHistoryId"
+        fun createRoute(quizHistoryId: String) = "quizHistory/$quizHistoryId"
+    }
+
     companion object {
         fun getStartDestination(isLoggedIn: Boolean): String {
             return if (isLoggedIn) Home.route else Login.route

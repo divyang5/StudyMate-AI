@@ -1,4 +1,4 @@
-package com.example.studymateai.ui.components
+package com.example.studymateai.ui.screen.quizz
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.Card
@@ -21,29 +20,35 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.studymateai.R
-import com.example.studymateai.data.model.chapters.Chapter
+import com.example.studymateai.data.model.quizz.QuizHistory
 import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
-fun ChapterCard(
-    chapter: Chapter,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+fun QuizHistoryCard(
+    history: QuizHistory,
+    onClick: () -> Unit
 ) {
+    val dateFormat = SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault())
+    val formattedDate = dateFormat.format(history.date)
+
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-        ),
-        modifier = modifier
+        modifier = Modifier.fillMaxWidth()
             .height(120.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (history.score >= 50) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+            } else {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+            }
+        ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
         Column(
@@ -64,7 +69,7 @@ fun ChapterCard(
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = chapter.title,
+                        text = history.chapterTitle,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -72,36 +77,32 @@ fun ChapterCard(
                         modifier = Modifier.weight(1f)
                     )
                 }
-
                 Spacer(modifier = Modifier.height(6.dp))
-
                 // Description
                 Text(
-                    text = "Description",
+                    text = "Score",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
                 Text(
-                    text = chapter.description,
+                    text = "${history.score}%",
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp)
+                    color = if (history.score >= 50) Color.Green else Color.Red,
+                    fontWeight = FontWeight.SemiBold
                 )
-
-
             }
+
+
             Spacer(modifier = Modifier.height(6.dp))
 
 
-            // Date with nice formatting
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = SimpleDateFormat("MMM dd, yyyy • hh:mm a").format(chapter.createdAt),
+                    text = formattedDate,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -109,7 +110,7 @@ fun ChapterCard(
                 Icon(
                     imageVector = Icons.Default.ArrowForward,
                     contentDescription = "View",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = if (history.score >= 50) Color.Green else Color.Red,
                     modifier = Modifier.size(16.dp)
                 )
             }
