@@ -36,7 +36,7 @@ jobs:
 
       - name: Update App Version
         run: |
-          GRADLE_FILE="./app/build.gradle"
+          GRADLE_FILE="./app/build.gradle.kts"
           if [ ! -f "$GRADLE_FILE" ]; then
           echo "::error::build.gradle not found at $GRADLE_FILE"
           ls -R # Debug directory structure
