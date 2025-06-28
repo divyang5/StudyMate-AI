@@ -74,7 +74,7 @@ fun QuizGenerationScreen(
     // Initialize Gemini
     val generativeModel = remember {
         GenerativeModel(
-            modelName = "gemini-2.0-flash",
+            modelName = "gemini-2.5-flash",
             apiKey = BuildConfig.GEMINI_API_KEY
         )
     }

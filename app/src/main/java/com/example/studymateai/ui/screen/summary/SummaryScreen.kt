@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -60,7 +61,7 @@ fun SummaryScreen(
 
     val generativeModel = remember {
         GenerativeModel(
-            modelName = "gemini-2.0-flash",
+            modelName = "gemini-2.5-flash",
             apiKey = BuildConfig.GEMINI_API_KEY
         )
     }
@@ -222,7 +223,7 @@ fun SummaryContent(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
@@ -265,7 +266,7 @@ private suspend fun generateSummary(
 
     try {
         val prompt = """
-            Summarize this text in 3-5 concise bullet points:
+            Summarize this text in short concise bullet points:
             "$content"
             
             Requirements:
@@ -274,6 +275,7 @@ private suspend fun generateSummary(
             - Focus on key concepts
             - Skip introductions
             - Return only the bullet points
+            - give some space between points
             
             Example format:
             - First key point
