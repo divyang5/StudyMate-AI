@@ -95,7 +95,8 @@ fun StudyMateNavHost(
                 },
                 onPasswordChange = {},
                 onSettingsClick = {},
-                onPrivacyClick = {}
+                onPrivacyClick = {},
+                navController=navController
             )
         }
 

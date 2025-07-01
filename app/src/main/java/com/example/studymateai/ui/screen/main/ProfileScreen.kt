@@ -27,14 +27,12 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,7 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import com.example.studymateai.shredPrefs.SharedPref
+import com.example.studymateai.ui.components.BottomNavigationBar
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 
@@ -55,7 +55,8 @@ fun ProfileScreen(
     onSettingsClick: () -> Unit,
     onPrivacyClick: () -> Unit,
     bottomPadding: PaddingValues = PaddingValues(0.dp) ,
-    context: Context = LocalContext.current
+    context: Context = LocalContext.current,
+    navController: NavController
 ) {
     val auth = Firebase.auth
     val user = auth.currentUser
@@ -66,15 +67,16 @@ fun ProfileScreen(
     val email = remember { mutableStateOf(user?.email ?: "user@example.com") }
 
     Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Profile") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.primary
-                )
-            )
-        }
+//        topBar = {
+//            CenterAlignedTopAppBar(
+//                title = { Text("Profile") },
+////                colors = TopAppBarDefaults.topAppBarColors(
+////                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+////                    titleContentColor = MaterialTheme.colorScheme.primary
+////                )
+//            )
+//        }
+        bottomBar = { BottomNavigationBar(navController) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -85,7 +87,7 @@ fun ProfileScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Profile Header (same as before)
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
@@ -173,8 +175,6 @@ fun ProfileScreen(
                 }
             }
 
-
-
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = onLogout,
@@ -189,7 +189,6 @@ fun ProfileScreen(
             ) {
                 Text("Logout")
             }
-            Spacer(modifier = Modifier.height(32.dp)) // Extra bottom padding
         }
     }
 }
