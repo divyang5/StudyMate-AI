@@ -102,16 +102,28 @@ fun StudyMateNavHost(
 
 
         composable(
-            route = Routes.Scan.route,
+            route = Routes.Scan.route + "?${Routes.Scan.ARG_FROM_CAMERA}={${Routes.Scan.ARG_FROM_CAMERA}}&${Routes.Scan.ARG_EXISTING_TEXT}={${Routes.Scan.ARG_EXISTING_TEXT}}",
             arguments = listOf(
                 navArgument(Routes.Scan.ARG_FROM_CAMERA) {
                     type = NavType.BoolType
                     defaultValue = false
+                },
+                navArgument(Routes.Scan.ARG_EXISTING_TEXT) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) { backStackEntry ->
             val fromCamera = backStackEntry.arguments?.getBoolean(Routes.Scan.ARG_FROM_CAMERA) ?: false
-            ScanScreen(fromCamera = fromCamera, navController = navController)
+            val existingTextEncoded = backStackEntry.arguments?.getString(Routes.Scan.ARG_EXISTING_TEXT)
+            val existingText = existingTextEncoded?.let { URLDecoder.decode(it, "UTF-8") }
+
+            ScanScreen(
+                fromCamera = fromCamera,
+                existingText = existingText,
+                navController = navController
+            )
         }
 
         composable(Routes.ChapterView.route) { backStackEntry ->

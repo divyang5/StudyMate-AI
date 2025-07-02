@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -66,6 +65,7 @@ import java.net.URLEncoder
 @Composable
 fun ScanScreen(
     fromCamera: Boolean,
+    existingText: String? = null,
     navController: NavController,
     context: Context = LocalContext.current
 ) {
@@ -95,12 +95,17 @@ fun ScanScreen(
         uri?.let {
             selectedImageUri.value = it
             isLoading.value = true
-            // Process selected image and navigate after extraction
             processUriForText(
                 context = context,
                 uri = it,
-                onTextExtracted = { text ->
-                    val encodedText = URLEncoder.encode(text, "UTF-8")
+                onTextExtracted = { newText ->
+                    // Combine with existing text if available
+                    val combinedText = if (!existingText.isNullOrEmpty()) {
+                        "$existingText\n\n$newText"
+                    } else {
+                        newText
+                    }
+                    val encodedText = URLEncoder.encode(combinedText, "UTF-8")
                     navController.navigate(Routes.TextEdit.createRoute(encodedText)) {
                         popUpTo(Routes.Scan.route) { inclusive = true }
                     }
@@ -189,14 +194,17 @@ fun ScanScreen(
                     showCameraScanner.value -> {
                         Box(modifier = Modifier.weight(1f)) {
                             CameraScanner(
-                                onTextDetected = { text ->
-                                    extractedText.value = text
-//                                    showCameraScanner.value = false
-                                    val encodedText = URLEncoder.encode(text, "UTF-8")
+                                onTextDetected = { newText ->
+                                    // Combine with existing text if available
+                                    val combinedText = if (!existingText.isNullOrEmpty()) {
+                                        "$existingText\n\n$newText"
+                                    } else {
+                                        newText
+                                    }
+                                    val encodedText = URLEncoder.encode(combinedText, "UTF-8")
                                     navController.navigate(Routes.TextEdit.createRoute(encodedText)) {
                                         popUpTo(Routes.Scan.route) { inclusive = true }
                                     }
-//                                    navController.navigate("textPreview/$text")
                                 },
                                 onError = { e ->
                                     errorMessage.value = e.message
@@ -205,14 +213,14 @@ fun ScanScreen(
                             )
 
                             // Close button for camera view
-                            IconButton(
-                                onClick = { showCameraScanner.value = false },
-                                modifier = Modifier
-                                    .align(Alignment.TopStart)
-                                    .padding(16.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "Close camera")
-                            }
+//                            IconButton(
+//                                onClick = { showCameraScanner.value = false },
+//                                modifier = Modifier
+//                                    .align(Alignment.TopStart)
+//                                    .padding(16.dp)
+//                            ) {
+//                                Icon(Icons.Default.Close, contentDescription = "Close camera")
+//                            }
 
                             errorMessage.value?.let { error ->
                                 Text("Error: $error", color = Color.Red)

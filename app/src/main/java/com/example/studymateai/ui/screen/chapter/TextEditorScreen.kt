@@ -15,9 +15,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,11 +29,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.studymateai.navigation.Routes
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.firestore
+import java.net.URLEncoder
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TextEditorScreen(
     extractedText: String,
@@ -44,110 +50,130 @@ fun TextEditorScreen(
     val showSuccess = remember { mutableStateOf(false) }
     val isSaving = remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        // Editable Extracted Text Section
-        Text(
-            text = "Edit Extracted Text",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        OutlinedTextField(
-            value = editableTextState.value,
-            onValueChange = { editableTextState.value = it },
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Edit Extracted Text") }
+            )
+        },
+    ){ padding ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp),
-            label = { Text("Extracted Text*") },
-            isError = showError.value && editableTextState.value.isEmpty()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Title Input
-        OutlinedTextField(
-            value = titleState.value,
-            onValueChange = { titleState.value = it },
-            label = { Text("Title*") },
-            modifier = Modifier.fillMaxWidth(),
-            isError = showError.value && titleState.value.isEmpty()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Description Input
-        OutlinedTextField(
-            value = descriptionState.value,
-            onValueChange = { descriptionState.value = it },
-            label = { Text("Description*") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp),
-            isError = showError.value && descriptionState.value.isEmpty()
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Action Buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Button(
-                onClick = {
-                    navController.navigate("scan?fromCamera=false") {
-                        popUpTo("textEditor") { inclusive = true }
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                .fillMaxSize()
+                .padding(
+                    top = padding.calculateTopPadding(),
+                    bottom = padding.calculateBottomPadding()
                 )
-            ) {
-                Text("Scan More Text")
-            }
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+//            Text(
+//                text = "Edit Extracted Text",
+//                style = MaterialTheme.typography.titleLarge,
+//                modifier = Modifier.padding(bottom = 8.dp)
+//            )
+            OutlinedTextField(
+                value = editableTextState.value,
+                onValueChange = { editableTextState.value = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp),
+                label = { Text("Extracted Text*") },
+                isError = showError.value && editableTextState.value.isEmpty()
+            )
 
-            Button(
-                onClick = {
-                    if (
-                        titleState.value.isEmpty() ||
-                        descriptionState.value.isEmpty() ||
-                        editableTextState.value.isEmpty()
-                    ) {
-                        showError.value = true
-                    } else {
-                        isSaving.value = true
-                        saveToFirestore(
-                            title = titleState.value,
-                            description = descriptionState.value,
-                            extractedText = editableTextState.value,
-                            onSuccess = {
-                                isSaving.value = false
-                                showSuccess.value = true
-                            },
-                            onError = {
-                                isSaving.value = false
-                                showError.value = true
-                            }
-                        )
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                enabled = !isSaving.value
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Title Input
+            OutlinedTextField(
+                value = titleState.value,
+                onValueChange = { titleState.value = it },
+                label = { Text("Title*") },
+                modifier = Modifier.fillMaxWidth(),
+                isError = showError.value && titleState.value.isEmpty()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Description Input
+            OutlinedTextField(
+                value = descriptionState.value,
+                onValueChange = { descriptionState.value = it },
+                label = { Text("Description*") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                isError = showError.value && descriptionState.value.isEmpty()
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if (isSaving.value) {
-                    CircularProgressIndicator(color = Color.White)
-                } else {
-                    Text("Save")
+                Button(
+                    onClick = {
+                        val encodedText = URLEncoder.encode(editableTextState.value, "UTF-8")
+                        navController.navigate(
+                            Routes.Scan.createRoute(
+                                fromCamera = false,
+                                existingText = encodedText
+                            )
+                        ) {
+                            popUpTo("textEditor") { inclusive = true }
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Text("Scan More Text")
+                }
+
+                Button(
+                    onClick = {
+                        if (
+                            titleState.value.isEmpty() ||
+                            descriptionState.value.isEmpty() ||
+                            editableTextState.value.isEmpty()
+                        ) {
+                            showError.value = true
+                        } else {
+                            isSaving.value = true
+                            saveToFirestore(
+                                title = titleState.value,
+                                description = descriptionState.value,
+                                extractedText = editableTextState.value,
+                                onSuccess = {
+                                    isSaving.value = false
+                                    showSuccess.value = true
+                                },
+                                onError = {
+                                    isSaving.value = false
+                                    showError.value = true
+                                }
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = !isSaving.value
+                ) {
+                    if (isSaving.value) {
+                        CircularProgressIndicator(color = Color.White)
+                    } else {
+                        Text("Save")
+                    }
                 }
             }
         }
     }
+
+
 
     // Error Dialog
     if (showError.value) {

@@ -218,7 +218,7 @@ fun HomeScreen(
                                 items(quickActions) { action ->
                                     QuickActionCard(action) {
                                         when (action) {
-                                            "Scan Document" -> navController.navigate(Routes.Scan.route)
+                                            "Scan Document" -> navController.navigate(Routes.Scan.createRoute(fromCamera = false))
                                             "Create Quiz" -> navController.navigate(Routes.QuizGen.route)
                                         }
                                     }

@@ -15,9 +15,19 @@ sealed class Routes(val route: String) {
 
 
     // Chapter Flow
-    object Scan : Routes("scan") {
+    object Scan {
+        const val route = "scan"
         const val ARG_FROM_CAMERA = "fromCamera"
-        fun createRoute(fromCamera: Boolean) = "scan?$ARG_FROM_CAMERA=$fromCamera"
+        const val ARG_EXISTING_TEXT = "existingText"
+
+        // Helper function to create the route with parameters
+        fun createRoute(fromCamera: Boolean, existingText: String? = null): String {
+            return if (existingText != null) {
+                "$route?$ARG_FROM_CAMERA=$fromCamera&$ARG_EXISTING_TEXT=${URLEncoder.encode(existingText, "UTF-8")}"
+            } else {
+                "$route?$ARG_FROM_CAMERA=$fromCamera"
+            }
+        }
     }
 
     object TextEdit : Routes("textedit/{extractedText}") {
