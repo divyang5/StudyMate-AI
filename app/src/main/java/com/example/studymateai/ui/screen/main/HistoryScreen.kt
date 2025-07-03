@@ -49,7 +49,6 @@ fun HistoryScreen(
             // Get quiz history
             val querySnapshot = firestore.collection("quizHistory")
                 .whereEqualTo("userId", userId)
-//                .orderBy("date")
                 .get()
                 .await()
 
@@ -128,6 +127,3 @@ fun HistoryScreen(
         }
     }
 }
-
-
-

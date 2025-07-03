@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,15 +22,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
@@ -70,6 +76,8 @@ fun QuizGenerationScreen(
     val showResult = remember { mutableStateOf(false) }
     val view = LocalView.current
 
+    val showQuestionCountDialog = remember { mutableStateOf(true) }
+    val questionCount = remember { mutableStateOf(10) }
 
     // Initialize Gemini
     val generativeModel = remember {
@@ -98,12 +106,13 @@ fun QuizGenerationScreen(
     // Function to generate quiz
     fun generateQuiz() {
         coroutineScope.launch {
-            isLoadingQuiz.value = true
+            isLoadingQuiz.value = true  // This should show the loading screen
             errorState.value = null
+            showQuestionCountDialog.value = false  // This closes the dialog
 
             try {
                 val prompt = """
-                Generate 5 multiple-choice questions from this text: 
+                Generate ${questionCount.value} multiple-choice questions from this text: 
                 "${chapterContent.value}". 
                 Format as a JSON array where each question has:
                 {
@@ -121,6 +130,7 @@ fun QuizGenerationScreen(
                 Log.d("QuizQuestions", "Parsed ${questions.size} questions")
 
                 quizQuestions.value = questions
+                showQuestionCountDialog.value = false
             } catch (e: Exception) {
                 errorState.value = "Failed to generate quiz: ${e.localizedMessage}"
                 Log.e("QuizGeneration", "Quiz generation error", e)
@@ -130,12 +140,7 @@ fun QuizGenerationScreen(
         }
     }
 
-    // Auto-generate quiz when content loads
-    LaunchedEffect(chapterContent.value) {
-        if (chapterContent.value.isNotEmpty()) {
-            generateQuiz()
-        }
-    }
+
 
     fun selectAnswer(questionIndex: Int, selectedOption: String) {
         if (!isSubmitted.value) {
@@ -205,9 +210,9 @@ fun QuizGenerationScreen(
                     }
                 },
                 actions = {
-                    if (!isLoadingContent.value && !isLoadingQuiz.value && !showResult.value) {
+                    if (!isLoadingContent.value && !isLoadingQuiz.value && !showResult.value && !showQuestionCountDialog.value) {
                         IconButton(
-                            onClick = { generateQuiz() },
+                            onClick = { showQuestionCountDialog.value = true },
                             enabled = chapterContent.value.isNotEmpty()
                         ) {
                             Icon(
@@ -246,6 +251,20 @@ fun QuizGenerationScreen(
                     )
                 }
 
+                showQuestionCountDialog.value -> {
+                    QuestionCountDialog(
+                        minQuestions = 5,
+                        maxQuestions = 20,
+                        initialCount = questionCount.value,
+                        onCountSelected = { count ->
+                            questionCount.value = count
+                            generateQuiz()
+                        },
+                        onDismiss = { navController.popBackStack() },
+                        isLoading = isLoadingQuiz.value
+                    )
+                }
+
                 isLoadingQuiz.value -> {
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -254,9 +273,10 @@ fun QuizGenerationScreen(
                     ) {
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Generating quiz questions...")
+                        Text("Generating ${questionCount.value} quiz questions...")
                     }
                 }
+
                 showResult.value -> {
                     QuizResultCard(
                         questions = quizQuestions.value,
@@ -266,6 +286,7 @@ fun QuizGenerationScreen(
                             selectedAnswers.clear()
                             isSubmitted.value = false
                             showResult.value = false
+                            showQuestionCountDialog.value = true
                         },
                         onGoHome = {
                             selectedAnswers.clear()
@@ -285,21 +306,24 @@ fun QuizGenerationScreen(
                         ) {
                             Text("No questions generated")
                             Button(
-                                onClick = { generateQuiz() },
+                                onClick = { showQuestionCountDialog.value = true },
                                 modifier = Modifier.padding(top = 16.dp)
                             ) {
                                 Text("Try Again")
                             }
                         }
                     } else {
-//                        QuizQuestionList(
-//                            questions = quizQuestions.value
-//                        )
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(16.dp)
                         ) {
+                            Text(
+                                text = "${quizQuestions.value.size} Questions",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+
                             LazyColumn(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -329,10 +353,10 @@ fun QuizGenerationScreen(
                             }
                         }
                     }
-                    }
                 }
             }
         }
+    }
 }
 
 @Composable
@@ -372,4 +396,71 @@ private fun parseQuizResponse(response: String): List<QuizQuestion> {
         Log.e("ParseError", "Failed to parse: $response", e)
         emptyList()
     }
+}
+
+@Composable
+fun QuestionCountDialog(
+    minQuestions: Int = 5,
+    maxQuestions: Int = 20,
+    initialCount: Int,
+    onCountSelected: (Int) -> Unit,
+    onDismiss: () -> Unit,
+    isLoading: Boolean
+) {
+    var sliderValue by remember { mutableStateOf(initialCount.toFloat()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Number of Questions") },
+        text = {
+            Column {
+                Text("How many questions would you like to generate?")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                ) {
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { newValue ->
+                            sliderValue = newValue
+                        },
+                        valueRange = minQuestions.toFloat()..maxQuestions.toFloat(),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("$minQuestions")
+                        Text(
+                            text = "${sliderValue.toInt()} questions",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text("$maxQuestions")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onCountSelected(sliderValue.toInt())
+                },
+                enabled = !isLoading
+            ) {
+                Text("Generate")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }

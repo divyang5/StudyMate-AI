@@ -164,7 +164,9 @@ fun ChapterDetailScreen(
                     ActionButton(
                         iconResId = R.drawable.flashcard,
                         text = "Create Flashcards",
-                        onClick = { navController.navigate(Routes.Flashcards.createRoute(chapterId)) }
+                        onClick = {
+//                            navController.navigate(Routes.Flashcards.createRoute(chapterId))
+                        }
                     )
                 }
             }
