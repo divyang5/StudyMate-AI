@@ -16,6 +16,7 @@ import com.example.studymateai.ui.screen.SignUpScreen
 import com.example.studymateai.ui.screen.chapter.ChapterDetailScreen
 import com.example.studymateai.ui.screen.chapter.ScanScreen
 import com.example.studymateai.ui.screen.chapter.TextEditorScreen
+import com.example.studymateai.ui.screen.flashCard.FlashCardScreen
 import com.example.studymateai.ui.screen.main.HistoryScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
 import com.example.studymateai.ui.screen.main.LibraryScreen
@@ -208,6 +209,21 @@ fun StudyMateNavHost(
             QuizHistoryDetailScreen(
                 navController = navController,
                 quizHistoryId = quizId
+            )
+        }
+
+        composable(
+            route = Routes.Flashcards.route,
+            arguments = listOf(
+                navArgument(Routes.Summary.CHAPTER_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val chapterId = backStackEntry.arguments?.getString(Routes.Summary.CHAPTER_ID) ?: ""
+            FlashCardScreen(
+                navController = navController,
+                chapterId = chapterId
             )
         }
 
