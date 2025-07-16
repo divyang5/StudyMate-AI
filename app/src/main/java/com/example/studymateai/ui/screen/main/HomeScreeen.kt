@@ -188,7 +188,9 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(
+                        top = padding.calculateTopPadding(),
+                        bottom = padding.calculateBottomPadding()+ 10.dp)
             ) {
                 // Sticky Header (non-scrollable)
                 WelcomeHeader()

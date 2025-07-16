@@ -67,15 +67,6 @@ fun ProfileScreen(
     val email = remember { mutableStateOf(user?.email ?: "user@example.com") }
 
     Scaffold(
-//        topBar = {
-//            CenterAlignedTopAppBar(
-//                title = { Text("Profile") },
-////                colors = TopAppBarDefaults.topAppBarColors(
-////                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-////                    titleContentColor = MaterialTheme.colorScheme.primary
-////                )
-//            )
-//        }
         bottomBar = { BottomNavigationBar(navController) }
     ) { padding ->
         Column(
@@ -83,7 +74,7 @@ fun ProfileScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState) // Enable scrolling
                 .padding(padding)
-                .padding(bottom = bottomPadding.calculateBottomPadding() + 80.dp) // Handle bottom nav
+                .padding(bottom = bottomPadding.calculateBottomPadding()) // Handle bottom nav
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
