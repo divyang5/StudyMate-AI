@@ -1,6 +1,7 @@
 package com.example.studymateai.ui.screen.flashCard
 
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -35,7 +38,7 @@ import androidx.navigation.NavController
 import com.example.studymateai.BuildConfig
 import com.example.studymateai.data.model.flashCard.Flashcard
 import com.google.accompanist.pager.ExperimentalPagerApi
-import com.google.accompanist.pager.HorizontalPager
+import com.google.accompanist.pager.VerticalPager
 import com.google.accompanist.pager.rememberPagerState
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.firebase.Firebase
@@ -119,7 +122,6 @@ fun FlashCardScreen(
 
             chapterContent.value = document.getString("content") ?: ""
 
-            // Automatically generate flashcards after loading content
             generateFlashcards()
         } catch (e: Exception) {
             errorState.value = "Failed to load chapter content: ${e.localizedMessage}"
@@ -204,14 +206,7 @@ fun FlashCardScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(16.dp)
                     ) {
-                        Text(
-                            text = "${flashcards.value.size} Key Concepts",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-
                         SwipeableFlashcards(flashcards = flashcards.value)
                     }
                 }
@@ -265,33 +260,62 @@ fun ErrorMessage(
 fun SwipeableFlashcards(flashcards: List<Flashcard>) {
     val pagerState = rememberPagerState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        HorizontalPager(
-            count = flashcards.size,
-            state = pagerState,
+    VerticalPager(
+        count = flashcards.size,
+        state = pagerState,
+        modifier = Modifier.fillMaxSize()
+    ) { page ->
+        Box(
             modifier = Modifier
-                .weight(1f)
+                .fillMaxSize()
                 .padding(8.dp)
-        ) { page ->
+        ) {
             FlashcardItem(
                 term = flashcards[page].term,
                 definition = flashcards[page].definition,
-                index = page + 1
+                index = page + 1,
+                modifier = Modifier.fillMaxSize()
             )
         }
+    }
 
-        // Add page indicators
-        Row(
-            modifier = Modifier
-                .height(50.dp)
-                .fillMaxWidth()
-                .align(Alignment.CenterHorizontally),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "${pagerState.currentPage + 1}/${flashcards.size}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
+    // Add floating page indicator
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 32.dp)
+//            .align(Alignment.BottomCenter)
+    ) {
+        PageIndicatorDots(
+            pageCount = flashcards.size,
+            currentPage = pagerState.currentPage,
+            modifier = Modifier.padding(8.dp)
+        )
+    }
+}
+
+@Composable
+fun PageIndicatorDots(
+    pageCount: Int,
+    currentPage: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        repeat(pageCount) { index ->
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .padding(2.dp)
+                    .background(
+                        color = if (currentPage == index)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(4.dp)
+                    )
             )
         }
     }

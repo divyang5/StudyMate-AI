@@ -15,10 +15,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import kotlin.random.Random
 
 @Composable
 fun FlashcardItem(
@@ -27,64 +29,66 @@ fun FlashcardItem(
     index: Int,
     modifier: Modifier = Modifier
 ) {
-
+    // Generate random subtle colors with low alpha
+    val randomColor = remember(index) {
+        Color(
+            red = Random.nextFloat() * 0.3f + 0.2f,
+            green = Random.nextFloat() * 0.3f + 0.2f,
+            blue = Random.nextFloat() * 0.3f + 0.2f,
+            alpha = 0.2f
+        )
+    }
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .height(400.dp)
+            .fillMaxSize()
             .padding(8.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor = randomColor
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.Top
         ) {
-            // Term/Heading section
-            Column {
+            // Header with index
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Concept #$index",
+                    text = "Flashcard #$index",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = term,
-                    style = MaterialTheme.typography.titleLarge.copy(
+                    style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp
-                    ),
-                    modifier = Modifier.padding(bottom = 16.dp)
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 )
             }
 
-            // Divider
-            Divider(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
-            )
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Definition/Content section
-            Column {
-                Text(
-                    text = "Definition:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+            // Definition content
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Divider(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = definition,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+                    ),
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
