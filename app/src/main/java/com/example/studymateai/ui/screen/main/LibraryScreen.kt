@@ -1,18 +1,33 @@
 package com.example.studymateai.ui.screen.main
 
 import android.util.Log
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.FractionalThreshold
+import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.rememberSwipeableState
+import androidx.compose.material.swipeable
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,10 +42,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import com.example.studymateai.data.model.chapters.Chapter
 import com.example.studymateai.navigation.Routes
@@ -39,7 +61,9 @@ import com.example.studymateai.ui.components.ChapterCard
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +76,26 @@ fun LibraryScreen(
     var searchQuery by remember { mutableStateOf("") }
     var activeSearch by remember { mutableStateOf(false) }
     var showSuggestions by remember { mutableStateOf(false) }
+
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var chapterToDelete by remember { mutableStateOf<Chapter?>(null) }
+    val context = LocalContext.current
+
+    // Function to delete chapter
+    fun deleteChapter(chapterId: String) {
+        val firestore = Firebase.firestore
+        firestore.collection("chapters").document(chapterId)
+            .delete()
+            .addOnSuccessListener {
+                // Remove from local state
+                chapters = chapters.filter { it.id != chapterId }
+                Toast.makeText(context, "Chapter deleted", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "Error deleting chapter", Toast.LENGTH_SHORT).show()
+                Log.e("LibraryScreen", "Error deleting chapter", e)
+            }
+    }
 
     // Fetch all chapters ordered by date (newest first)
     LaunchedEffect(Unit) {
@@ -222,16 +266,115 @@ fun LibraryScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredChapters) { chapter ->
-                        ChapterCard(
-                            chapter = chapter,
-                            onClick = {
-                                navController.navigate(
-                                    Routes.ChapterDetail.createRoute(chapter.id)
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        SwipeToDeleteContainer(
+                            item = chapter,
+                            onDelete = {
+                                chapterToDelete = chapter
+                                showDeleteDialog = true
+                            }
+                        ) {
+                            ChapterCard(
+                                chapter = chapter,
+                                onClick = {
+                                    navController.navigate(
+                                        Routes.ChapterDetail.createRoute(chapter.id)
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
+                }
+            }
+        }
+    }
+    // Delete confirmation dialog
+    if (showDeleteDialog && chapterToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Chapter") },
+            text = { Text("Are you sure you want to delete \"${chapterToDelete?.title}\"?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        chapterToDelete?.id?.let { deleteChapter(it) }
+                        showDeleteDialog = false
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+fun <T> SwipeToDeleteContainer(
+    item: T,
+    onDelete: () -> Unit,
+    content: @Composable (T) -> Unit
+) {
+    val swipeableState = rememberSwipeableState(initialValue = 0)
+    val coroutineScope = rememberCoroutineScope()
+    val swipeThreshold = 100.dp
+    val sizePx = with(LocalDensity.current) { swipeThreshold.toPx() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+    ) {
+        if (swipeableState.offset.value > 0) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.error)
+                    .padding(end = 16.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.error)
+                )
+            }
+        }
+
+        // Content with swipe gesture
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(swipeableState.offset.value.roundToInt(), 0) }
+                .swipeable(
+                    state = swipeableState,
+                    anchors = mapOf(
+                        0f to 0,
+                        sizePx to 1
+                    ),
+                    thresholds = { _, _ -> FractionalThreshold(0.5f) },
+                    orientation = Orientation.Horizontal
+                )
+                .fillMaxWidth()
+                .zIndex(1f)
+        ) {
+            content(item)
+        }
+
+        // Handle swipe completion
+        LaunchedEffect(swipeableState.currentValue) {
+            if (swipeableState.currentValue == 1) {
+                onDelete()
+                coroutineScope.launch {
+                    swipeableState.animateTo(0)
                 }
             }
         }

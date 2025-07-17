@@ -5,9 +5,9 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
-     id("kotlin-kapt")
-     id("com.google.dagger.hilt.android")
-
+    id("kotlin-kapt")
+    id("com.google.dagger.hilt.android")
+    id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -136,5 +136,8 @@ dependencies {
     implementation("com.google.accompanist:accompanist-pager:0.28.0")
     implementation("com.google.accompanist:accompanist-pager-indicators:0.28.0")
 
+    implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
+    implementation("com.google.firebase:firebase-crashlytics-ndk")
+    implementation("com.google.firebase:firebase-analytics")
 
 }

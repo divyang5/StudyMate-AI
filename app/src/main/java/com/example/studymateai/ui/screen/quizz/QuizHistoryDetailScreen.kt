@@ -1,6 +1,7 @@
 package com.example.studymateai.ui.screen.quizz
 
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -40,7 +42,6 @@ import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.foundation.lazy.items
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -166,7 +167,8 @@ fun QuizHistoryDetailScreen(
                             colors = CardDefaults.cardColors(
                                 containerColor = if (isCorrect) MaterialTheme.colorScheme.primaryContainer
                                 else MaterialTheme.colorScheme.errorContainer
-                            )
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(

@@ -1,13 +1,13 @@
 package com.example.studymateai.ui.screen.chapter
 
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -43,6 +43,7 @@ import com.example.studymateai.navigation.Routes
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.tasks.await
+import java.net.URLEncoder
 import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,7 +84,10 @@ fun ChapterDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-//                        navController.navigate("editChapter/${chapterId}")
+                        chapter.value?.let {
+                            val encodedContent = URLEncoder.encode(it.content, "UTF-8")
+                            navController.navigate(Routes.TextEdit.createRoute(encodedContent))
+                        }
                     }) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit")
                     }
@@ -103,27 +107,28 @@ fun ChapterDetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
                     .padding(padding)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    ),
+                Box(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .height(300.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .verticalScroll(rememberScrollState())
-                            .padding(16.dp)
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.fillMaxSize(),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
                     ) {
                         Column(
+                            modifier = Modifier
+                                .verticalScroll(rememberScrollState())
+                                .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
@@ -140,7 +145,7 @@ fun ChapterDetailScreen(
                     }
                 }
 
-
+                // Action buttons at the bottom
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)

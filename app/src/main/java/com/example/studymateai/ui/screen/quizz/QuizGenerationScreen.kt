@@ -1,6 +1,7 @@
 package com.example.studymateai.ui.screen.quizz
 
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -29,7 +28,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -47,6 +46,10 @@ import com.example.studymateai.BuildConfig
 import com.example.studymateai.R
 import com.example.studymateai.data.model.quizz.QuizQuestion
 import com.example.studymateai.navigation.Routes
+import com.example.studymateai.ui.screen.flashCard.ErrorMessage
+import com.google.accompanist.pager.ExperimentalPagerApi
+import com.google.accompanist.pager.HorizontalPager
+import com.google.accompanist.pager.rememberPagerState
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -54,8 +57,9 @@ import com.google.firebase.firestore.firestore
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlin.random.Random
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPagerApi::class)
 @Composable
 fun QuizGenerationScreen(
     navController: NavController,
@@ -78,6 +82,8 @@ fun QuizGenerationScreen(
 
     val showQuestionCountDialog = remember { mutableStateOf(true) }
     val questionCount = remember { mutableStateOf(10) }
+    val pagerState = rememberPagerState()
+
 
     // Initialize Gemini
     val generativeModel = remember {
@@ -203,7 +209,7 @@ fun QuizGenerationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (showResult.value) "Quiz Results" else "Generated Quiz") },
+                title = { Text(if (showResult.value) "Quiz Results" else "Question ${pagerState.currentPage + 1}/${quizQuestions.value.size}") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -314,42 +320,59 @@ fun QuizGenerationScreen(
                         }
                     } else {
                         Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp)
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            Text(
-                                text = "${quizQuestions.value.size} Questions",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-
-                            LazyColumn(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            Column(
+                                modifier = Modifier.fillMaxSize()
                             ) {
-                                itemsIndexed(quizQuestions.value) { index, question ->
-                                    key(question.question) {
+                                HorizontalPager(
+                                    count = quizQuestions.value.size,
+                                    state = pagerState,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                ) { page ->
+                                    val question = quizQuestions.value[page]
+                                    val randomColor = remember(page) {
+                                        val hue = Random.nextFloat() * 360f
+                                        Color.hsv(
+                                            hue = hue,
+                                            saturation = 0.7f,
+                                            value = 0.8f,
+                                            alpha = 0.05f
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(randomColor)
+                                    ) {
                                         QuizQuestionCard(
                                             question = question,
-                                            selectedAnswer = selectedAnswers[index],
+                                            selectedAnswer = selectedAnswers[page],
                                             onAnswerSelected = { answer ->
-                                                selectAnswer(index, answer)
+                                                selectAnswer(page, answer)
                                             },
-                                            showCorrectAnswer = isSubmitted.value
+                                            showCorrectAnswer = isSubmitted.value,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .align(Alignment.Center)
+                                                .padding(16.dp)
+                                            ,
+                                            randomColor
                                         )
                                     }
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Button(
-                                onClick = { submitQuiz() },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = selectedAnswers.size == quizQuestions.value.size && !isSubmitted.value
-                            ) {
-                                Text("Submit Quiz")
+                                Button(
+                                    onClick = { submitQuiz() },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    enabled = selectedAnswers.size == quizQuestions.value.size && !isSubmitted.value
+                                ) {
+                                    Text("Submit Quiz")
+                                }
                             }
                         }
                     }
@@ -464,3 +487,4 @@ fun QuestionCountDialog(
         }
     )
 }
+

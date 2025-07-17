@@ -82,7 +82,7 @@ fun FlashCardScreen(
                 
                 Each flashcard should have:
                 - A term/concept (short and clear)
-                - A definition/explanation (concise but comprehensive enough to understand the concept)
+                - A definition/explanation (concise but comprehensive enough to understand the concept , slightly detailed )
                 
                 Format as a JSON array where each flashcard has:
                 {

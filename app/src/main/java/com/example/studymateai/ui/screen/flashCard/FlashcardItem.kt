@@ -29,13 +29,13 @@ fun FlashcardItem(
     index: Int,
     modifier: Modifier = Modifier
 ) {
-    // Generate random subtle colors with low alpha
     val randomColor = remember(index) {
-        Color(
-            red = Random.nextFloat() * 0.3f + 0.2f,
-            green = Random.nextFloat() * 0.3f + 0.2f,
-            blue = Random.nextFloat() * 0.3f + 0.2f,
-            alpha = 0.2f
+        val hue = Random.nextFloat() * 360f
+        Color.hsv(
+            hue = hue,
+            saturation = 0.8f,
+            value = 0.9f,
+            alpha = 0.25f
         )
     }
 
@@ -86,7 +86,7 @@ fun FlashcardItem(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = definition,
-                    style = MaterialTheme.typography.bodyLarge.copy(
+                    style = MaterialTheme.typography.titleMedium.copy(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
                     ),
                     modifier = Modifier.padding(bottom = 8.dp)
