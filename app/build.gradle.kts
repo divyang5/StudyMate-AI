@@ -7,6 +7,7 @@ plugins {
     id("com.google.gms.google-services")
     id("kotlin-kapt")
     id("com.google.dagger.hilt.android")
+    id ("dagger.hilt.android.plugin")
     id("com.google.firebase.crashlytics")
 }
 

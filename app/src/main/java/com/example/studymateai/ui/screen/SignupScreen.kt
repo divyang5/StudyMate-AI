@@ -39,7 +39,6 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,7 +53,7 @@ fun SignUpScreen(
     val confirmPasswordState = remember { mutableStateOf("") }
     val passwordErrorState = remember { mutableStateOf<String?>(null) }
     val isLoading = remember { mutableStateOf(false) }
-    val showSuccessDialog = remember { mutableStateOf(false) }
+    val showVerificationDialog = remember { mutableStateOf(false) } // Changed to verification dialog
     val showErrorDialog = remember { mutableStateOf(false) }
     val errorMessage = remember { mutableStateOf("") }
 
@@ -158,7 +157,6 @@ fun SignUpScreen(
                 }
             )
 
-
             Spacer(modifier = Modifier.height(24.dp))
 
             // Sign Up Button
@@ -182,7 +180,7 @@ fun SignUpScreen(
                             lastName = lastNameState.value,
                             onSuccess = {
                                 isLoading.value = false
-                                showSuccessDialog.value = true
+                                showVerificationDialog.value = true // Show verification dialog
                             },
                             onError = { message ->
                                 isLoading.value = false
@@ -210,7 +208,6 @@ fun SignUpScreen(
                 }
             }
 
-
             Spacer(modifier = Modifier.height(24.dp))
 
             // Already have account - Login
@@ -224,20 +221,29 @@ fun SignUpScreen(
             }
         }
 
-        // Success Dialog
-        if (showSuccessDialog.value) {
+        // Verification Required Dialog
+        if (showVerificationDialog.value) {
             AlertDialog(
-                onDismissRequest = { showSuccessDialog.value = false },
-                title = { Text("Account Created") },
-                text = { Text("Your account has been created successfully!") },
+                onDismissRequest = { showVerificationDialog.value = false },
+                title = { Text("Verify Your Email") },
+                text = {
+                    Column {
+                        Text("Your account has been created successfully!")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Please verify your email address before logging in.")
+                        Text("We've sent a verification email to ${emailState.value}")
+                    }
+                },
                 confirmButton = {
                     Button(
                         onClick = {
-                            showSuccessDialog.value = false
-                            onSignUpSuccess()
+                            showVerificationDialog.value = false
+                            // Sign out the user immediately after signup
+                            auth.signOut()
+                            onLoginClick()
                         }
                     ) {
-                        Text("Continue")
+                        Text("Go to Login")
                     }
                 }
             )
@@ -261,39 +267,7 @@ fun SignUpScreen(
     }
 }
 
-// Updated Firebase functions
-private suspend fun createUserWithFirebase(
-    auth: FirebaseAuth,
-    firestore: FirebaseFirestore,
-    email: String,
-    password: String,
-    firstName: String,
-    lastName: String
-): Result<Unit> {
-    return try {
-        // 1. Create auth user
-        val authResult = auth.createUserWithEmailAndPassword(email, password).await()
-
-        // 2. Create user document in Firestore
-        val user = hashMapOf(
-            "uid" to authResult.user?.uid,
-            "firstName" to firstName,
-            "lastName" to lastName,
-            "email" to email,
-            "createdAt" to FieldValue.serverTimestamp()
-        )
-
-        firestore.collection("users")
-            .document(authResult.user?.uid ?: "")
-            .set(user)
-            .await()
-
-        Result.success(Unit)
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-}
-
+// Updated Firebase function to send verification email
 private fun createUserWithEmailAndPassword(
     auth: FirebaseAuth,
     firestore: FirebaseFirestore,
@@ -319,8 +293,20 @@ private fun createUserWithEmailAndPassword(
                 firestore.collection("users")
                     .document(authTask.result.user?.uid ?: "")
                     .set(user)
-                    .addOnSuccessListener { onSuccess() }
-                    .addOnFailureListener { e -> onError(e.message ?: "Failed to create user profile") }
+                    .addOnSuccessListener {
+                        // Send verification email
+                        authTask.result.user?.sendEmailVerification()
+                            ?.addOnCompleteListener { verificationTask ->
+                                if (verificationTask.isSuccessful) {
+                                    onSuccess()
+                                } else {
+                                    onError("Account created but verification email failed: ${verificationTask.exception?.message}")
+                                }
+                            } ?: onError("Failed to send verification email")
+                    }
+                    .addOnFailureListener { e ->
+                        onError(e.message ?: "Failed to create user profile")
+                    }
             } else {
                 onError(authTask.exception?.message ?: "Unknown error occurred")
             }

@@ -12,7 +12,13 @@ sealed class Routes(val route: String) {
     object Library : Routes("library")
     object History : Routes("history")
     object Profile : Routes("profile")
+    object ForgetPassword : Routes("forgot_password")
 
+    object EditProfile : Routes("editProfile")
+    object ChangeEmail : Routes("changeEmail")
+    object ChangePassword : Routes("changePassword")
+    object AppSettings : Routes("appSettings")
+    object PrivacyPolicy : Routes("privacyPolicy")
 
     // Chapter Flow
     object Scan {

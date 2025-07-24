@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.studymateai.shredPrefs.SharedPref
+import com.example.studymateai.ui.screen.ForgotPasswordScreen
 import com.example.studymateai.ui.screen.LoginScreen
 import com.example.studymateai.ui.screen.SignUpScreen
 import com.example.studymateai.ui.screen.chapter.ChapterDetailScreen
@@ -21,6 +22,11 @@ import com.example.studymateai.ui.screen.main.HistoryScreen
 import com.example.studymateai.ui.screen.main.HomeScreen
 import com.example.studymateai.ui.screen.main.LibraryScreen
 import com.example.studymateai.ui.screen.main.ProfileScreen
+import com.example.studymateai.ui.screen.profile.AppSettingsScreen
+import com.example.studymateai.ui.screen.profile.ChangeEmailScreen
+import com.example.studymateai.ui.screen.profile.ChangePasswordScreen
+import com.example.studymateai.ui.screen.profile.EditProfileScreen
+import com.example.studymateai.ui.screen.profile.PrivacyPolicyScreen
 import com.example.studymateai.ui.screen.quizz.QuizGenerationScreen
 import com.example.studymateai.ui.screen.quizz.QuizHistoryDetailScreen
 import com.example.studymateai.ui.screen.summary.SummaryScreen
@@ -48,7 +54,6 @@ fun StudyMateNavHost(
         popEnterTransition = { screenFadeIn() },
         popExitTransition = { screenSlideOut() },
     ) {
-        // Auth Screens
         composable(Routes.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
@@ -57,8 +62,13 @@ fun StudyMateNavHost(
                     }
                 },
                 onSignUpClick = { navController.navigate(Routes.SignUp.route) },
-                onForgotPasswordClick = {}
+                onForgotPasswordClick = {
+                    navController.navigate(Routes.ForgetPassword.route)
+                }
             )
+        }
+        composable(Routes.ForgetPassword.route) {
+            ForgotPasswordScreen(navController)
         }
 
         composable(Routes.SignUp.route) {
@@ -72,7 +82,7 @@ fun StudyMateNavHost(
             )
         }
 
-        // Main Tabs
+
         composable(Routes.Home.route) {
             HomeScreen(navController)
         }
@@ -94,9 +104,6 @@ fun StudyMateNavHost(
                         popUpTo(0)
                     }
                 },
-                onPasswordChange = {},
-                onSettingsClick = {},
-                onPrivacyClick = {},
                 navController=navController
             )
         }
@@ -226,6 +233,28 @@ fun StudyMateNavHost(
                 chapterId = chapterId
             )
         }
+
+
+        composable(Routes.EditProfile.route) {
+            EditProfileScreen(navController)
+        }
+
+        composable(Routes.ChangeEmail.route) {
+            ChangeEmailScreen(navController)
+        }
+
+        composable(Routes.ChangePassword.route) {
+            ChangePasswordScreen(navController)
+        }
+
+        composable(Routes.AppSettings.route) {
+            AppSettingsScreen(navController)
+        }
+
+        composable(Routes.PrivacyPolicy.route) {
+            PrivacyPolicyScreen(navController)
+        }
+
 
     }
 }

@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.studymateai.navigation.Routes
 import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.components.BottomNavigationBar
 import com.google.firebase.Firebase
@@ -51,9 +52,6 @@ import com.google.firebase.auth.auth
 @Composable
 fun ProfileScreen(
     onLogout: () -> Unit,
-    onPasswordChange: () -> Unit,
-    onSettingsClick: () -> Unit,
-    onPrivacyClick: () -> Unit,
     bottomPadding: PaddingValues = PaddingValues(0.dp) ,
     context: Context = LocalContext.current,
     navController: NavController
@@ -110,7 +108,7 @@ fun ProfileScreen(
                 )
             }
 
-            // Account Section (same as before)
+
             Text(
                 text = "Account",
                 style = MaterialTheme.typography.titleMedium,
@@ -121,27 +119,28 @@ fun ProfileScreen(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column {
+
                     ProfileItem(
                         icon = Icons.Default.Person,
                         text = "Edit Profile",
-                        onClick = {  }
+                        onClick = { navController.navigate(Routes.EditProfile.route) }
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
                     ProfileItem(
                         icon = Icons.Default.Email,
                         text = "Change Email",
-                        onClick = {  }
+                        onClick = { navController.navigate(Routes.ChangeEmail.route) }
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
                     ProfileItem(
                         icon = Icons.Default.Lock,
                         text = "Change Password",
-                        onClick = onPasswordChange
+                        onClick = { navController.navigate(Routes.ChangePassword.route) }
                     )
                 }
             }
 
-            // Settings Section (same as before)
+            // Settings Section
             Text(
                 text = "Settings",
                 style = MaterialTheme.typography.titleMedium,
@@ -155,13 +154,13 @@ fun ProfileScreen(
                     ProfileItem(
                         icon = Icons.Default.Settings,
                         text = "App Settings",
-                        onClick = onSettingsClick
+                        onClick = { navController.navigate(Routes.AppSettings.route) }
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
                     ProfileItem(
                         icon = Icons.Default.Person,
                         text = "Privacy Policy",
-                        onClick = onPrivacyClick
+                        onClick = { navController.navigate(Routes.PrivacyPolicy.route) }
                     )
                 }
             }

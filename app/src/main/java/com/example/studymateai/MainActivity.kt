@@ -18,8 +18,9 @@ import com.example.studymateai.ui.theme.StudyMateAITheme
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.initialize
+import dagger.hilt.android.AndroidEntryPoint
 
-
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
