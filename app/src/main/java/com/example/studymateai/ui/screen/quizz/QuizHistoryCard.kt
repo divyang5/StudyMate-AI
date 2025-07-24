@@ -33,7 +33,8 @@ import java.util.Locale
 @Composable
 fun QuizHistoryCard(
     history: QuizHistory,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val dateFormat = SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault())
     val formattedDate = dateFormat.format(history.date)
