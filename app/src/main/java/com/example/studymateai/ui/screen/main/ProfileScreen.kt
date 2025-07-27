@@ -38,10 +38,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.studymateai.R
 import com.example.studymateai.navigation.Routes
 import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.components.BottomNavigationBar
@@ -121,19 +122,37 @@ fun ProfileScreen(
                 Column {
 
                     ProfileItem(
-                        icon = Icons.Default.Person,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Profile",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
                         text = "Edit Profile",
                         onClick = { navController.navigate(Routes.EditProfile.route) }
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
                     ProfileItem(
-                        icon = Icons.Default.Email,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = "Email",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
                         text = "Change Email",
                         onClick = { navController.navigate(Routes.ChangeEmail.route) }
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
                     ProfileItem(
-                        icon = Icons.Default.Lock,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Password",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
                         text = "Change Password",
                         onClick = { navController.navigate(Routes.ChangePassword.route) }
                     )
@@ -152,13 +171,25 @@ fun ProfileScreen(
             ) {
                 Column {
                     ProfileItem(
-                        icon = Icons.Default.Settings,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
                         text = "App Settings",
                         onClick = { navController.navigate(Routes.AppSettings.route) }
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
                     ProfileItem(
-                        icon = Icons.Default.Person,
+                        icon =  {
+                            Icon(
+                                painter = painterResource(id = R.drawable.privacy_tips),
+                                contentDescription = "Privacy Policy",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
                         text = "Privacy Policy",
                         onClick = { navController.navigate(Routes.PrivacyPolicy.route) }
                     )
@@ -185,7 +216,7 @@ fun ProfileScreen(
 
 @Composable
 fun ProfileItem(
-    icon: ImageVector,
+    icon: @Composable () -> Unit,
     text: String,
     onClick: () -> Unit
 ) {
@@ -197,16 +228,20 @@ fun ProfileItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
+        // Icon container that works for both Material and custom icons
+        Box(
+            modifier = Modifier.size(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            icon()
+        }
+
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )
+
         Icon(
             imageVector = Icons.Default.KeyboardArrowRight,
             contentDescription = "Navigate",

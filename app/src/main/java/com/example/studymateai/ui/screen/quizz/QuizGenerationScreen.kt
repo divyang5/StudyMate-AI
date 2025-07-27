@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -44,6 +45,7 @@ import androidx.core.view.HapticFeedbackConstantsCompat
 import androidx.navigation.NavController
 import com.example.studymateai.BuildConfig
 import com.example.studymateai.R
+import com.example.studymateai.ads.AdManager
 import com.example.studymateai.data.model.quizz.QuizQuestion
 import com.example.studymateai.navigation.Routes
 import com.example.studymateai.ui.screen.flashCard.ErrorMessage
@@ -55,6 +57,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import com.google.gson.Gson
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlin.random.Random
@@ -84,6 +87,9 @@ fun QuizGenerationScreen(
     val questionCount = remember { mutableStateOf(10) }
     val pagerState = rememberPagerState()
 
+    val context = LocalContext.current
+    val adManager = remember { AdManager(context) }
+
 
     // Initialize Gemini
     val generativeModel = remember {
@@ -108,13 +114,16 @@ fun QuizGenerationScreen(
             isLoadingContent.value = false
         }
     }
+    LaunchedEffect(Unit) {
+        adManager.loadInterstitialAd("ca-app-pub-1428496463629890/8616846219")
+    }
 
-    // Function to generate quiz
-    fun generateQuiz() {
+     fun generateQuiz() {
         coroutineScope.launch {
             isLoadingQuiz.value = true  // This should show the loading screen
             errorState.value = null
             showQuestionCountDialog.value = false  // This closes the dialog
+
 
             try {
                 val prompt = """
@@ -130,10 +139,10 @@ fun QuizGenerationScreen(
             """.trimIndent()
 
                 val response = generativeModel.generateContent(prompt)
-                Log.d("QuizResponse", "Raw response: ${response.text}")
+//                Log.d("QuizResponse", "Raw response: ${response.text}")
 
                 val questions = parseQuizResponse(response.text ?: "")
-                Log.d("QuizQuestions", "Parsed ${questions.size} questions")
+//                Log.d("QuizQuestions", "Parsed ${questions.size} questions")
 
                 quizQuestions.value = questions
                 showQuestionCountDialog.value = false
@@ -142,9 +151,24 @@ fun QuizGenerationScreen(
                 Log.e("QuizGeneration", "Quiz generation error", e)
             } finally {
                 isLoadingQuiz.value = false
+                if (adManager.isAdLoaded()) {
+                    delay(1000)
+                    adManager.showInterstitialAd(
+                        onAdDismissed = {
+                            Log.d("AdsGeneration", "Ads generation from dismissed from on click")
+                        },
+                        onAdFailed = {
+
+                            Log.d("AdsGeneration", "Ads generation from failed  1 from on click")
+
+                        }
+                    )
+                }
             }
         }
     }
+
+
 
 
 

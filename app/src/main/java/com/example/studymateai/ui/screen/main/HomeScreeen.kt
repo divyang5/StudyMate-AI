@@ -19,9 +19,14 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -35,8 +40,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.studymateai.R
+import com.example.studymateai.ads.AdManager
 import com.example.studymateai.data.model.chapters.Chapter
 import com.example.studymateai.navigation.Routes
 import com.example.studymateai.shredPrefs.SharedPref
@@ -57,9 +66,12 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class,
+    ExperimentalMaterialApi::class
+)
 @Composable
 fun HomeScreen(
     navController: NavController,
@@ -75,6 +87,9 @@ fun HomeScreen(
     val auth = Firebase.auth
     val firestore = Firebase.firestore
     val sharedPref = remember { SharedPref(context) }
+    val refreshScope = rememberCoroutineScope()
+    var refreshing by remember { mutableStateOf(false) }
+    val adManager = remember { AdManager(context) }
 
     // State for user data
     val firstName = remember { mutableStateOf("") }
@@ -158,6 +173,53 @@ fun HomeScreen(
         }
     }
 
+    // Create a function to handle refresh
+    fun refreshData() {
+        refreshScope.launch {
+            refreshing = true
+            // Re-fetch all data
+            try {
+                val userId = auth.currentUser?.uid ?: return@launch
+
+                // Refresh user data
+                val document = firestore.collection("users").document(userId).get().await()
+                firstName.value = document.getString("firstName") ?: ""
+                lastName.value = document.getString("lastName") ?: ""
+
+                // Refresh chapters
+                isChaptersLoading.value = true
+                val querySnapshot = firestore.collection("chapters")
+                    .whereEqualTo("userId", userId)
+                    .limit(5)
+                    .get()
+                    .await()
+
+                chapters.value = querySnapshot.documents
+                    .mapNotNull { doc ->
+                        doc.getDate("createdAt")?.let { date ->
+                            Chapter(
+                                id = doc.id,
+                                title = doc.getString("title") ?: "",
+                                description = doc.getString("description") ?: "",
+                                content = doc.getString("content") ?: "",
+                                createdAt = date
+                            )
+                        }
+                    }
+                    .sortedByDescending { it.createdAt }
+            } catch (e: Exception) {
+                Log.e("HomeScreen", "Refresh failed", e)
+            } finally {
+                refreshing = false
+                isChaptersLoading.value = false
+            }
+        }
+    }
+    val refreshState = rememberPullRefreshState(
+        refreshing = refreshing,
+        onRefresh = { refreshData() }
+    )
+
     if (showPermissionDialog.value) {
         PermissionDialog(
             onDismiss = { showPermissionDialog.value = false },
@@ -195,78 +257,104 @@ fun HomeScreen(
                 // Sticky Header (non-scrollable)
                 WelcomeHeader()
 
-                // Scrollable Content
-                LazyColumn(
-                    modifier = Modifier.weight(1f)
-                        .padding(top = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
-                ) {
-                    item {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(24.dp)
-                        ) {
-                            // Quick Actions Section
-                            Text(
-                                text = "Quick Actions",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                adManager.BannerAd(
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
 
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth()
+
+                Box(modifier = Modifier.pullRefresh(refreshState)) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .padding(top = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                        state = rememberLazyListState()
+                    ) {
+                        item {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(24.dp)
                             ) {
-                                items(quickActions) { action ->
-                                    QuickActionCard(action) {
-                                        when (action) {
-                                            "Scan Document" -> navController.navigate(Routes.Scan.createRoute(fromCamera = false))
-                                            "Create Quiz" -> navController.navigate(Routes.QuizGen.route)
+                                // Quick Actions Section
+                                Text(
+                                    text = "Quick Actions",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(quickActions) { action ->
+                                        QuickActionCard(action) {
+                                            when (action) {
+                                                "Scan Document" -> navController.navigate(
+                                                    Routes.Scan.createRoute(
+                                                        fromCamera = false
+                                                    )
+                                                )
+
+                                                "Create Quiz" -> navController.navigate(Routes.QuizGen.route)
+                                            }
                                         }
                                     }
                                 }
+
+                                // Recent Chapters Section
+                                Text(
+                                    text = "Recent Chapters",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
+                        }
 
-                            // Recent Chapters Section
-                            Text(
-                                text = "Recent Chapters",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                        // Chapters List
+                        if (isChaptersLoading.value) {
+                            item {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .wrapContentWidth(Alignment.CenterHorizontally)
+                                )
+                            }
+                        } else if (chapters.value.isEmpty()) {
+                            item {
+                                Text(
+                                    text = "No chapters found",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+                        } else {
+                            items(chapters.value) { chapter ->
+                                ChapterCard(
+                                    chapter = chapter,
+                                    onClick = {
+                                        navController.navigate(
+                                            Routes.ChapterDetail.createRoute(
+                                                chapter.id
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                )
+                            }
                         }
                     }
 
-                    // Chapters List
-                    if (isChaptersLoading.value) {
-                        item {
-                            CircularProgressIndicator(modifier = Modifier
-                                .fillMaxWidth()
-                                .wrapContentWidth(Alignment.CenterHorizontally))
-                        }
-                    } else if (chapters.value.isEmpty()) {
-                        item {
-                            Text(
-                                text = "No chapters found",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                        }
-                    } else {
-                        items(chapters.value) { chapter ->
-                            ChapterCard(
-                                chapter = chapter,
-                                onClick = {
-                                    navController.navigate(Routes.ChapterDetail.createRoute(chapter.id))
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp)
-                            )
-                        }
-                    }
+                    PullRefreshIndicator(
+                        refreshing = refreshing,
+                        state = refreshState,
+                        modifier = Modifier.align(Alignment.TopCenter)
+                    )
                 }
             }
+
         }
     }
 }

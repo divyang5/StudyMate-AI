@@ -132,6 +132,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     implementation("androidx.compose.material3:material3:1.3.2")
+    implementation("androidx.compose.material:material:1.8.3")
     implementation("androidx.compose.material:material-icons-core:1.7.8")
 
     implementation("com.google.accompanist:accompanist-pager:0.28.0")
@@ -140,5 +141,8 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
     implementation("com.google.firebase:firebase-crashlytics-ndk")
     implementation("com.google.firebase:firebase-analytics")
+
+    //google admob
+    implementation("com.google.android.gms:play-services-ads:24.5.0")
 
 }

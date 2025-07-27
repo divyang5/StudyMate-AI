@@ -32,10 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.studymateai.BuildConfig
+import com.example.studymateai.ads.AdManager
 import com.example.studymateai.data.model.flashCard.Flashcard
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.VerticalPager
@@ -44,6 +46,7 @@ import com.google.ai.client.generativeai.GenerativeModel
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import com.google.gson.Gson
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -61,7 +64,12 @@ fun FlashCardScreen(
 
     val isLoadingFlashcards = remember { mutableStateOf(false) }
     val flashcards = remember { mutableStateOf<List<Flashcard>>(emptyList()) }
+    val context = LocalContext.current
+    val adManager = remember { AdManager(context) }
 
+    LaunchedEffect(Unit) {
+        adManager.loadInterstitialAd("ca-app-pub-1428496463629890/8616846219")
+    }
     // Initialize Gemini
     val generativeModel = remember {
         GenerativeModel(
@@ -109,6 +117,19 @@ fun FlashCardScreen(
                 Log.e("FlashcardGeneration", "Flashcard generation error", e)
             } finally {
                 isLoadingFlashcards.value = false
+                if (adManager.isAdLoaded()) {
+                    delay(1000)
+                    adManager.showInterstitialAd(
+                        onAdDismissed = {
+                            Log.d("AdsGeneration", "Ads generation from dismissed from on click")
+                        },
+                        onAdFailed = {
+
+                            Log.d("AdsGeneration", "Ads generation from failed  1 from on click")
+
+                        }
+                    )
+                }
             }
         }
     }
