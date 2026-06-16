@@ -14,12 +14,16 @@ val DarkBluePrimary = Color(0xFF058FCE)
 val DarkBlueSecondary = Color(0xFF80D8FF)
 val DarkBlueTertiary = Color(0xFF01579B)
 
+val LightBackground = Color(0xFFF2F2F7)
+val DarkBackground = Color(0xFF1C1C1E)
+
 val StudyMateLightBlueColorScheme = lightColorScheme(
     primary = LightBluePrimary,
     onPrimary = Color.White,
     primaryContainer = LightBlueTertiary,
     onPrimaryContainer = Color(0xFF00204D),
-    secondary = LightBlueSecondary
+    secondary = LightBlueSecondary,
+    background = LightBackground
 )
 
 val StudyMateDarkBlueColorScheme = darkColorScheme(
@@ -27,5 +31,6 @@ val StudyMateDarkBlueColorScheme = darkColorScheme(
     onPrimary = Color.White,
     primaryContainer = DarkBlueTertiary,
     onPrimaryContainer = Color(0xFF00204D),
-    secondary = DarkBlueSecondary
+    secondary = DarkBlueSecondary,
+    background = DarkBackground
 )

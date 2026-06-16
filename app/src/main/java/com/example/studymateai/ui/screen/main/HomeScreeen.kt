@@ -48,11 +48,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.studymateai.R
 import com.example.studymateai.ads.AdManager
 import com.example.studymateai.data.model.chapters.Chapter
 import com.example.studymateai.navigation.Routes
@@ -240,6 +238,8 @@ fun HomeScreen(
         }
     }
     Scaffold(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.background),
         bottomBar = { BottomNavigationBar(navController) }
     ) { padding ->
         if (isLoading.value) {
@@ -450,12 +450,6 @@ fun WelcomeHeader() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_launcher_foreground),
-                    contentDescription = "StudyMate AI Logo",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(40.dp)
-                )
                 Text(
                     text = "StudyMate AI",
                     style = MaterialTheme.typography.titleMedium,
