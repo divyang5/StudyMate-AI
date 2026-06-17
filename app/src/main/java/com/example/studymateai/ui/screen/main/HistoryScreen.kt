@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -106,9 +107,17 @@ fun HistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Quiz History") },
-                actions = {}
+                title = {
+                            Text(
+                                text = "Quiz History",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                actions = {},
+                colors = TopAppBarDefaults.topAppBarColors(MaterialTheme.colorScheme.background)
             )
+
         },
         bottomBar = { BottomNavigationBar(navController) }
     ) { padding ->

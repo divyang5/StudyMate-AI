@@ -71,6 +71,7 @@ android {
 dependencies {
 
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.text.google.fonts)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -145,5 +146,6 @@ dependencies {
 
     //google admob
     implementation("com.google.android.gms:play-services-ads:24.5.0")
+
 
 }

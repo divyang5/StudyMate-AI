@@ -68,7 +68,7 @@ fun FlashCardScreen(
     val adManager = remember { AdManager(context) }
 
     LaunchedEffect(Unit) {
-        adManager.loadInterstitialAd("ca-app-pub-1428496463629890/8616846219")
+        adManager.loadInterstitialAd()
     }
     // Initialize Gemini
     val generativeModel = remember {

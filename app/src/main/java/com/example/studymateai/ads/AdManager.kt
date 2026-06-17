@@ -33,14 +33,16 @@ class AdManager(private val context: Context) {
 
     // Banner Ad Properties
     private var bannerAdView: AdView? = null
+    private var interstitialADUnit: String = "ca-app-pub-3940256099942544/1033173712"
+    private var bannerADUnit: String = "ca-app-pub-3940256099942544/6300978111"
 
 
-    fun loadInterstitialAd(adUnitId: String) {
+    fun loadInterstitialAd() {
         val adRequest = AdRequest.Builder().build()
-        InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
+        InterstitialAd.load(context, interstitialADUnit, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(ad: InterstitialAd) {
                 interstitialAd = ad
-                Log.d("AdManager", "Ad loaded successfully")
+                Log.d("AdManager", "Ad loaded successfull y")
             }
 
             override fun onAdFailedToLoad(error: LoadAdError) {
@@ -60,13 +62,13 @@ class AdManager(private val context: Context) {
             ad.fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdDismissedFullScreenContent() {
                     interstitialAd = null
-                    loadInterstitialAd("ca-app-pub-1428496463629890/8616846219")
+                    loadInterstitialAd()
                     onAdDismissed()
                 }
 
                 override fun onAdFailedToShowFullScreenContent(adError: AdError) {
                     interstitialAd = null
-                    loadInterstitialAd("ca-app-pub-1428496463629890/8616846219")
+                    loadInterstitialAd()
                     onAdFailed()
                 }
             }
@@ -79,8 +81,7 @@ class AdManager(private val context: Context) {
     // Banner Ad Methods
     @Composable
     fun BannerAd(
-        modifier: Modifier = Modifier,
-        adUnitId: String = "ca-app-pub-1428496463629890/7092011553"
+        modifier: Modifier = Modifier
     ) {
         val context = LocalContext.current
         var loadError by remember { mutableStateOf(false) }
@@ -89,7 +90,7 @@ class AdManager(private val context: Context) {
         DisposableEffect(Unit) {
             val newAdView = AdView(context).apply {
                 setAdSize(AdSize.BANNER)
-                this.adUnitId = adUnitId
+                this.adUnitId = bannerADUnit
                 adListener = object : AdListener() {
                     override fun onAdFailedToLoad(adError: LoadAdError) {
                         loadError = true

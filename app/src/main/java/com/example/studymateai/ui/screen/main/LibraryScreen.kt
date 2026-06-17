@@ -37,6 +37,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -145,7 +146,19 @@ fun LibraryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { if (activeSearch) Text("Search Library") else Text("Your Library") },
+                title = { if (activeSearch)
+                    Text(
+                        text = "Search Library",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                else
+                    Text(
+                        text = "Your Library",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                        },
                 actions = {
                     if (!activeSearch) {
                         IconButton(onClick = {
@@ -155,7 +168,8 @@ fun LibraryScreen(
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(MaterialTheme.colorScheme.background)
             )
         },
         bottomBar = { BottomNavigationBar(navController) }
