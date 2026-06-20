@@ -36,9 +36,22 @@ sealed class Routes(val route: String) {
         }
     }
 
-    object TextEdit : Routes("textedit/{extractedText}") {
-        const val EXTRACTED_TEXT = "extractedText"
-        fun createRoute(extractedText: String) = "textedit/${URLEncoder.encode(extractedText, "UTF-8")}"
+//    object TextEdit : Routes("textedit/{extractedText}") {
+//        const val EXTRACTED_TEXT = "extractedText"
+//        fun createRoute(extractedText: String) = "textedit/${URLEncoder.encode(extractedText, "UTF-8")}"
+//    }
+
+    object TextEdit : Routes("textEditor?title={title}&description={description}&content={content}&chapterId={chapterId}") {
+        const val content = "content"
+        const val title = "title"
+        const val description = "description"
+        fun createRoute(title: String,
+                        description: String,
+                        content: String,
+                        chapterId: String? = null) : String {
+            val base = "textEditor?title=$title&description=$description&content=$content"
+            return if (chapterId != null) "$base&chapterId=$chapterId" else base
+        }
     }
 
     object ChapterView : Routes("chapter/{id}") {

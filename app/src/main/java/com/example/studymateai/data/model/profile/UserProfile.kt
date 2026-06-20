@@ -7,5 +7,8 @@ data class UserProfile(
     val firstName: String = "",
     val lastName: String = "",
     val email: String = "",
-    val createdAt: Timestamp? = null
+    val createdAt: Timestamp? = null,
+    val isUserLoading: Boolean = true,
+    val error: String? = null
+
 )

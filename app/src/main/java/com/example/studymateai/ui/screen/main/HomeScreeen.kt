@@ -1,9 +1,7 @@
 package com.example.studymateai.ui.screen.main
 
 import android.Manifest
-import android.content.Context
 import android.os.Build
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +33,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,7 +42,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,332 +51,237 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.studymateai.R
 import com.example.studymateai.ads.AdManager
-import com.example.studymateai.data.model.chapters.Chapter
+import com.example.studymateai.data.viewmodel.HomeUiState
+import com.example.studymateai.data.viewmodel.HomeViewModel
 import com.example.studymateai.navigation.Routes
-import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.components.BottomNavigationBar
 import com.example.studymateai.ui.components.ChapterCard
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.google.firebase.Firebase
-import com.google.firebase.auth.UserProfileChangeRequest
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.firestore
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
+// ─── Screen ─────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class,
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalPermissionsApi::class,
     ExperimentalMaterialApi::class
 )
 @Composable
 fun HomeScreen(
     navController: NavController,
-    context: Context = LocalContext.current
+    viewModel: HomeViewModel = viewModel()
 ) {
-    val quickActions = listOf(
-        "Scan Document",
-//        "Create Quiz",
-//        "Make Flashcards",
-//        "Generate Summary"
-    )
-
-    val auth = Firebase.auth
-    val firestore = Firebase.firestore
-    val sharedPref = remember { SharedPref(context) }
-    val refreshScope = rememberCoroutineScope()
-    var refreshing by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
     val adManager = remember { AdManager(context) }
 
-    // State for user data
-    val firstName = remember { mutableStateOf("") }
-    val lastName = remember { mutableStateOf("") }
-    val isLoading = remember { mutableStateOf(true) }
-    val chapters = remember { mutableStateOf<List<Chapter>>(emptyList()) }
-    val isChaptersLoading = remember { mutableStateOf(false) }
-
-    // Permission states
-    val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
-    val galleryPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    // ── Permissions ──────────────────────────────────────────────────────────
+    val galleryPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
         Manifest.permission.READ_MEDIA_IMAGES
-    } else {
+    else
         Manifest.permission.READ_EXTERNAL_STORAGE
-    }
-    val galleryPermissionState = rememberPermissionState(galleryPermission)
 
-    val showPermissionDialog = remember { mutableStateOf(false) }
+    val cameraPermission  = rememberPermissionState(Manifest.permission.CAMERA)
+    val galleryPermission2 = rememberPermissionState(galleryPermission)
 
+    var showPermissionDialog by remember { mutableStateOf(false) }
 
-    // Fetch user data when screen loads
     LaunchedEffect(Unit) {
-        if (!cameraPermissionState.status.isGranted || !galleryPermissionState.status.isGranted) {
-            showPermissionDialog.value = true
-        }
-        val userId = auth.currentUser?.uid ?: return@LaunchedEffect
-        try {
-            val document = firestore.collection("users").document(userId).get().await()
-            val userFirstName = document.getString("firstName") ?: ""
-            val userLastName = document.getString("lastName") ?: ""
-
-            // Update state
-            firstName.value = userFirstName
-            lastName.value = userLastName
-
-            // Save to SharedPreferences
-            sharedPref.setPrefString("FIRST_NAME", userFirstName)
-            sharedPref.setPrefString("LAST_NAME", userLastName)
-
-            // Update auth display name
-            val userProfileChangeRequest = UserProfileChangeRequest.Builder()
-                .setDisplayName("$userFirstName $userLastName")
-                .build()
-            auth.currentUser?.updateProfile(userProfileChangeRequest)
-            Log.d("HomeScreen", "User" + userFirstName + userLastName  )
-
-            isLoading.value = false
-        } catch (e: Exception) {
-            isLoading.value = false
-            Log.e("HomeScreen", "Error fetching User", e)
-        }
-
-        isChaptersLoading.value = true
-        try {
-            val userId = auth.currentUser?.uid ?: return@LaunchedEffect
-            val querySnapshot = firestore.collection("chapters")
-                .whereEqualTo("userId", userId)
-//                .orderBy("createdAt", Query.Direction.DESCENDING)
-                .limit(5)
-                .get()
-                .await()
-
-            val chaptersList = querySnapshot.documents
-                .mapNotNull { doc ->
-                    doc.getDate("createdAt")?.let { date ->
-                        Chapter(
-                            id = doc.id,
-                            title = doc.getString("title") ?: "",
-                            description = doc.getString("description") ?: "",
-                            content = doc.getString("content") ?: "",
-                            createdAt = date
-                        )
-                    }
-                }
-                .sortedByDescending { it.createdAt }
-            chapters.value = chaptersList
-        } catch (e: Exception) {
-            Log.e("HomeScreen", "Error fetching chapters", e)
-        } finally {
-            isChaptersLoading.value = false
+        if (!cameraPermission.status.isGranted || !galleryPermission2.status.isGranted) {
+            showPermissionDialog = true
         }
     }
 
-    // Create a function to handle refresh
-    fun refreshData() {
-        refreshScope.launch {
-            refreshing = true
-            // Re-fetch all data
-            try {
-                val userId = auth.currentUser?.uid ?: return@launch
-
-                // Refresh user data
-                val document = firestore.collection("users").document(userId).get().await()
-                firstName.value = document.getString("firstName") ?: ""
-                lastName.value = document.getString("lastName") ?: ""
-
-                // Refresh chapters
-                isChaptersLoading.value = true
-                val querySnapshot = firestore.collection("chapters")
-                    .whereEqualTo("userId", userId)
-                    .limit(5)
-                    .get()
-                    .await()
-
-                chapters.value = querySnapshot.documents
-                    .mapNotNull { doc ->
-                        doc.getDate("createdAt")?.let { date ->
-                            Chapter(
-                                id = doc.id,
-                                title = doc.getString("title") ?: "",
-                                description = doc.getString("description") ?: "",
-                                content = doc.getString("content") ?: "",
-                                createdAt = date
-                            )
-                        }
-                    }
-                    .sortedByDescending { it.createdAt }
-            } catch (e: Exception) {
-                Log.e("HomeScreen", "Refresh failed", e)
-            } finally {
-                refreshing = false
-                isChaptersLoading.value = false
-            }
+    // ── Error Snackbar ───────────────────────────────────────────────────────
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
         }
     }
-    val refreshState = rememberPullRefreshState(
-        refreshing = refreshing,
-        onRefresh = { refreshData() }
+
+    // ── Pull-to-Refresh ──────────────────────────────────────────────────────
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = uiState.isRefreshing,
+        onRefresh  = viewModel::refresh
     )
 
-    if (showPermissionDialog.value) {
+    // ── Permission Dialog ────────────────────────────────────────────────────
+    if (showPermissionDialog) {
         PermissionDialog(
-            onDismiss = { showPermissionDialog.value = false },
+            onDismiss = { showPermissionDialog = false },
             onConfirm = {
-                cameraPermissionState.launchPermissionRequest()
-                galleryPermissionState.launchPermissionRequest()
+                cameraPermission.launchPermissionRequest()
+                galleryPermission2.launchPermissionRequest()
+                showPermissionDialog = false
             }
         )
     }
 
-    if (cameraPermissionState.status.isGranted && galleryPermissionState.status.isGranted) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("Scan Document Screen")
-        }
-    }
     Scaffold(
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.background),
-        bottomBar = { BottomNavigationBar(navController) }
+        modifier      = Modifier.background(MaterialTheme.colorScheme.background),
+        bottomBar     = { BottomNavigationBar(navController) },
+        snackbarHost  = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        if (isLoading.value) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+
+        if (uiState.isUserLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
-                        top = padding.calculateTopPadding(),
-                        bottom = padding.calculateBottomPadding()+ 10.dp)
-            ) {
-                // Sticky Header (non-scrollable)
-                WelcomeHeader()
+            return@Scaffold
+        }
 
-                adManager.BannerAd(
-                    modifier = Modifier.fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    top    = padding.calculateTopPadding(),
+                    bottom = padding.calculateBottomPadding() + 10.dp
+                )
+        ) {
+            // ── Sticky App Bar ───────────────────────────────────────────────
+            WelcomeHeader()
+
+            // ── Banner Ad ────────────────────────────────────────────────────
+            adManager.BannerAd(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+
+            // ── Scrollable Content + Pull Refresh ────────────────────────────
+            Box(modifier = Modifier.pullRefresh(pullRefreshState)) {
+                HomeContent(
+                    uiState       = uiState,
+                    navController = navController
                 )
 
-
-                Box(modifier = Modifier.pullRefresh(refreshState)) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .padding(top = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp),
-                        state = rememberLazyListState()
-                    ) {
-                        item {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(24.dp)
-                            ) {
-                                // Quick Actions Section
-                                Text(
-                                    text = "Quick Actions",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    items(quickActions) { action ->
-                                        QuickActionCard(action) {
-                                            when (action) {
-                                                "Scan Document" -> navController.navigate(
-                                                    Routes.Scan.createRoute(
-                                                        fromCamera = false
-                                                    )
-                                                )
-
-                                                "Create Quiz" -> navController.navigate(Routes.QuizGen.route)
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Recent Chapters Section
-                                Text(
-                                    text = "Recent Chapters",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        // Chapters List
-                        if (isChaptersLoading.value) {
-                            item {
-                                CircularProgressIndicator(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .wrapContentWidth(Alignment.CenterHorizontally)
-                                )
-                            }
-                        } else if (chapters.value.isEmpty()) {
-                            item {
-                                Text(
-                                    text = "No chapters found",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
-                            }
-                        } else {
-                            items(chapters.value) { chapter ->
-                                ChapterCard(
-                                    chapter = chapter,
-                                    onClick = {
-                                        navController.navigate(
-                                            Routes.ChapterDetail.createRoute(
-                                                chapter.id
-                                            )
-                                        )
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    PullRefreshIndicator(
-                        refreshing = refreshing,
-                        state = refreshState,
-                        modifier = Modifier.align(Alignment.TopCenter)
-                    )
-                }
+                PullRefreshIndicator(
+                    refreshing = uiState.isRefreshing,
+                    state      = pullRefreshState,
+                    modifier   = Modifier.align(Alignment.TopCenter)
+                )
             }
-
         }
     }
 }
 
+// ─── Home Content ────────────────────────────────────────────────────────────
+
+@Composable
+private fun HomeContent(
+    uiState: HomeUiState,
+    navController: NavController
+) {
+    LazyColumn(
+        modifier            = Modifier.padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        state               = rememberLazyListState()
+    ) {
+        // Quick Actions header + row
+        item {
+            Column(
+                modifier            = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                SectionTitle("Quick Actions")
+                QuickActionsRow(navController)
+                SectionTitle("Recent Chapters")
+            }
+        }
+
+        // Chapters list
+        when {
+            uiState.isChaptersLoading -> item {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentWidth(Alignment.CenterHorizontally)
+                )
+            }
+
+            uiState.chapters.isEmpty() -> item {
+                Text(
+                    text     = "No chapters yet. Scan a document to get started!",
+                    style    = MaterialTheme.typography.bodyMedium,
+                    color    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+
+            else -> items(uiState.chapters, key = { it.id }) { chapter ->
+                ChapterCard(
+                    chapter  = chapter,
+                    onClick  = { navController.navigate(Routes.ChapterDetail.createRoute(chapter.id)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                )
+            }
+        }
+    }
+}
+
+// ─── Quick Actions ───────────────────────────────────────────────────────────
+
+private data class QuickAction(val label: String, val route: () -> String)
+
+private val quickActions = listOf(
+    "Scan Document"
+    // "Create Quiz", "Make Flashcards", "Generate Summary"  ← uncomment when ready
+)
+
+@Composable
+private fun QuickActionsRow(navController: NavController) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier              = Modifier.fillMaxWidth()
+    ) {
+        items(quickActions) { action ->
+            QuickActionCard(text = action) {
+                when (action) {
+                    "Scan Document" -> navController.navigate(Routes.Scan.createRoute(fromCamera = false))
+                    "Create Quiz"   -> navController.navigate(Routes.QuizGen.route)
+                }
+            }
+        }
+    }
+}
+
+// ─── Reusable Components ─────────────────────────────────────────────────────
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text       = text,
+        style      = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickActionCard(text: String, onClick: () -> Unit) {
     Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
+        onClick  = onClick,
+        shape    = RoundedCornerShape(16.dp),
+        colors   = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            contentColor   = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         modifier = Modifier
             .width(150.dp)
             .height(120.dp)
     ) {
         Column(
-            modifier = Modifier
+            modifier            = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
@@ -386,26 +290,22 @@ fun QuickActionCard(text: String, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(40.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(12.dp)
+                        color  = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        shape  = RoundedCornerShape(12.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = when (text) {
-                        "Scan Document" -> Icons.Default.Add
-//                        "Create Quiz" -> Icons.Default.Quiz
-                        else -> Icons.Default.Add
-                    },
+                    imageVector     = Icons.Default.Add,   // swap per action if needed
                     contentDescription = text,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                    tint            = MaterialTheme.colorScheme.primary,
+                    modifier        = Modifier.size(24.dp)
                 )
             }
 
             Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
+                text       = text,
+                style      = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -419,62 +319,46 @@ fun PermissionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Permissions Needed") },
-        text = { Text("StudyMate AI needs camera and gallery permissions to scan documents") },
-        confirmButton = {
-            Button(onClick = {
-                onConfirm()
-                onDismiss()
-            }) {
-                Text("Allow")
-            }
+        title            = { Text("Permissions Needed") },
+        text             = { Text("StudyMate AI needs camera and gallery access to scan documents.") },
+        confirmButton    = {
+            Button(onClick = onConfirm) { Text("Allow") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Not Now")
-            }
+        dismissButton    = {
+            TextButton(onClick = onDismiss) { Text("Not Now") }
         }
     )
 }
 
 @Composable
 fun WelcomeHeader() {
-
     val fontProvider = GoogleFont.Provider(
         providerAuthority = "com.google.android.gms.fonts",
-        providerPackage = "com.google.android.gms",
-        certificates = R.array.com_google_android_gms_fonts_certs
+        providerPackage   = "com.google.android.gms",
+        certificates      = R.array.com_google_android_gms_fonts_certs
     )
-
-    // For Playpen Sans
-    val playpenSansFontFamily = FontFamily(
+    val mrDafoeFontFamily = FontFamily(
         Font(
-            googleFont = GoogleFont("Mr Dafoe"),
-            fontProvider = fontProvider,
-            weight = FontWeight.Bold // Adjust as needed
+            googleFont    = GoogleFont("Mr Dafoe"),
+            fontProvider  = fontProvider,
+            weight        = FontWeight.Bold
         )
     )
+
     Box(
-        modifier = Modifier
+        modifier          = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment  = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 10.dp)
-            ,
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-                Text(
-                    text = "Studymate",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = playpenSansFontFamily
-                )
-        }
+        Text(
+            text       = "Studymate",
+            style      = MaterialTheme.typography.headlineMedium,
+            color      = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            fontFamily = mrDafoeFontFamily,
+            modifier   = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
+        )
     }
 }
 

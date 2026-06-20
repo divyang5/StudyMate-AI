@@ -1,251 +1,221 @@
 package com.example.studymateai.ui.screen.chapter
 
-import android.content.Context
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
+import com.example.studymateai.data.viewmodel.TextEditorViewModel
 import com.example.studymateai.navigation.Routes
-import com.google.firebase.Firebase
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.firestore
+
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import java.net.URLEncoder
 
+/**
+ * Navigation route must now pass title, description, content as encoded params.
+ *
+ * Updated Routes.TextEdit.createRoute signature (update your Routes file):
+ *   fun createRoute(title: String, description: String, content: String) =
+ *       "textEditor?title=$title&description=$description&content=$content"
+ *
+ * NavGraph destination:
+ *   argument("title") { defaultValue = "" }
+ *   argument("description") { defaultValue = "" }
+ *   argument("content") { defaultValue = "" }
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TextEditorScreen(
-    extractedText: String,
+    // Decoded strings received from nav args
+    title: String = "",
+    description: String = "",
+    extractedText: String = "",
+    chapterId: String? = null,           // null = create, non-null = edit existing
     navController: NavController,
-    context: Context = LocalContext.current
+    viewModel: TextEditorViewModel = viewModel()
 ) {
-    val titleState = remember { mutableStateOf("") }
-    val descriptionState = remember { mutableStateOf("") }
-    val editableTextState = remember { mutableStateOf(extractedText) }
-    val showError = remember { mutableStateOf(false) }
-    val showSuccess = remember { mutableStateOf(false) }
-    val isSaving = remember { mutableStateOf(false) }
+    // Seed ViewModel once on first composition
+    LaunchedEffect(Unit) {
+        viewModel.init(
+            title = title,
+            description = description,
+            content = extractedText,
+            chapterId = chapterId        // tells ViewModel whether to update or add
+        )
+    }
 
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Success → navigate home
+    LaunchedEffect(uiState.saveSuccess) {
+        if (uiState.saveSuccess) {
+            viewModel.clearSuccess()
+            navController.navigate("home") {
+                popUpTo("textEditor") { inclusive = true }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit Extracted Text") }
+                title = {
+                    Text(
+                        "Edit Chapter",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
-        },
-    ){ padding ->
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(
-                    top = padding.calculateTopPadding(),
-                    bottom = padding.calculateBottomPadding()
-                )
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-//            Text(
-//                text = "Edit Extracted Text",
-//                style = MaterialTheme.typography.titleLarge,
-//                modifier = Modifier.padding(bottom = 8.dp)
-//            )
+            Spacer(Modifier.height(4.dp))
+
+            // Content field — largest, at top
+            SectionLabel("Content")
             OutlinedTextField(
-                value = editableTextState.value,
-                onValueChange = { editableTextState.value = it },
+                value = uiState.content,
+                onValueChange = viewModel::onContentChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(300.dp),
-                label = { Text("Extracted Text*") },
-                isError = showError.value && editableTextState.value.isEmpty()
+                    .heightIn(min = 200.dp, max = 320.dp),
+                label = { Text("Chapter text") },
+                isError = uiState.showValidationErrors && uiState.content.isBlank(),
+                supportingText = if (uiState.showValidationErrors && uiState.content.isBlank()) {
+                    { Text("Content is required") }
+                } else null,
+                shape = RoundedCornerShape(14.dp),
+                maxLines = 20
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Title Input
+            // Title
+            SectionLabel("Title")
             OutlinedTextField(
-                value = titleState.value,
-                onValueChange = { titleState.value = it },
-                label = { Text("Title*") },
+                value = uiState.title,
+                onValueChange = viewModel::onTitleChange,
                 modifier = Modifier.fillMaxWidth(),
-                isError = showError.value && titleState.value.isEmpty()
+                label = { Text("Chapter title") },
+                isError = uiState.showValidationErrors && uiState.title.isBlank(),
+                supportingText = if (uiState.showValidationErrors && uiState.title.isBlank()) {
+                    { Text("Title is required") }
+                } else null,
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Description Input
+            // Description
+            SectionLabel("Description")
             OutlinedTextField(
-                value = descriptionState.value,
-                onValueChange = { descriptionState.value = it },
-                label = { Text("Description*") },
+                value = uiState.description,
+                onValueChange = viewModel::onDescriptionChange,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
-                isError = showError.value && descriptionState.value.isEmpty()
+                label = { Text("Short description") },
+                isError = uiState.showValidationErrors && uiState.description.isBlank(),
+                supportingText = if (uiState.showValidationErrors && uiState.description.isBlank()) {
+                    { Text("Description is required") }
+                } else null,
+                shape = RoundedCornerShape(14.dp),
+                maxLines = 5
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(4.dp))
 
-            // Action Buttons
+            // Action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(
+                OutlinedButton(
                     onClick = {
-                        val encodedText = URLEncoder.encode(editableTextState.value, "UTF-8")
+                        val encodedText = URLEncoder.encode(uiState.content, "UTF-8")
                         navController.navigate(
-                            Routes.Scan.createRoute(
-                                fromCamera = false,
-                                existingText = encodedText
-                            )
+                            Routes.Scan.createRoute(fromCamera = false, existingText = encodedText)
                         ) {
                             popUpTo("textEditor") { inclusive = true }
                         }
                     },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp)
                 ) {
-                    Text("Scan More Text")
+                    Text("Scan More")
                 }
 
                 Button(
-                    onClick = {
-                        if (
-                            titleState.value.isEmpty() ||
-                            descriptionState.value.isEmpty() ||
-                            editableTextState.value.isEmpty()
-                        ) {
-                            showError.value = true
-                        } else {
-                            isSaving.value = true
-                            saveToFirestore(
-                                title = titleState.value,
-                                description = descriptionState.value,
-                                extractedText = editableTextState.value,
-                                onSuccess = {
-                                    isSaving.value = false
-                                    showSuccess.value = true
-                                },
-                                onError = {
-                                    isSaving.value = false
-                                    showError.value = true
-                                }
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = !isSaving.value
+                    onClick = { viewModel.save() },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    enabled = !uiState.isSaving
                 ) {
-                    if (isSaving.value) {
-                        CircularProgressIndicator(color = Color.White)
+                    if (uiState.isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
                     } else {
-                        Text("Save")
+                        Text("Save", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 
-
-
-    // Error Dialog
-    if (showError.value) {
+    // Error snackbar via AlertDialog
+    uiState.errorMessage?.let { msg ->
         AlertDialog(
-            onDismissRequest = { showError.value = false },
+            onDismissRequest = { viewModel.clearError() },
             title = { Text("Error") },
-            text = {
-                Text(
-                    when {
-                        titleState.value.isEmpty() && descriptionState.value.isEmpty() && editableTextState.value.isEmpty() ->
-                            "Please enter title, description and extracted text"
-                        titleState.value.isEmpty() -> "Please enter a title"
-                        descriptionState.value.isEmpty() -> "Please enter a description"
-                        editableTextState.value.isEmpty() -> "Extracted text cannot be empty"
-                        else -> "Failed to save. Please try again."
-                    }
-                )
+            text = { Text(msg) },
+            confirmButton = {
+                Button(onClick = { viewModel.clearError() }) { Text("OK") }
             },
-            confirmButton = {
-                Button(onClick = { showError.value = false }) {
-                    Text("OK")
-                }
-            }
-        )
-    }
-
-    // Success Dialog
-    if (showSuccess.value) {
-        AlertDialog(
-            onDismissRequest = { showSuccess.value = false },
-            title = { Text("Success") },
-            text = { Text("Document saved successfully!") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showSuccess.value = false
-                        navController.navigate("home") {
-                            popUpTo("textEditor") { inclusive = true }
-                        }
-                    }
-                ) {
-                    Text("Go to Home")
-                }
-            }
+            shape = RoundedCornerShape(16.dp)
         )
     }
 }
 
-private fun saveToFirestore(
-    title: String,
-    description: String,
-    extractedText: String,
-    onSuccess: () -> Unit,
-    onError: () -> Unit
-) {
-    val db = Firebase.firestore
-    val userId = Firebase.auth.currentUser?.uid ?: return onError()
-
-    val documentData = hashMapOf(
-        "title" to title,
-        "description" to description,
-        "content" to extractedText,
-        "createdAt" to FieldValue.serverTimestamp(),
-        "userId" to userId
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary
     )
-
-    db.collection("chapters")
-        .add(documentData)
-        .addOnSuccessListener {
-            onSuccess()
-        }
-        .addOnFailureListener {
-            onError()
-        }
 }

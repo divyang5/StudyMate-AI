@@ -1,5 +1,6 @@
 package com.example.studymateai.ui.screen.main
 
+import com.example.studymateai.data.viewmodel.ProfileViewModel
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,57 +28,75 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.studymateai.R
 import com.example.studymateai.navigation.Routes
-import com.example.studymateai.shredPrefs.SharedPref
 import com.example.studymateai.ui.components.BottomNavigationBar
-import com.google.firebase.Firebase
-import com.google.firebase.auth.auth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onLogout: () -> Unit,
-    bottomPadding: PaddingValues = PaddingValues(0.dp) ,
+    bottomPadding: PaddingValues = PaddingValues(0.dp),
     context: Context = LocalContext.current,
-    navController: NavController
+    navController: NavController,
+    viewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory(context))
 ) {
-    val auth = Firebase.auth
-    val user = auth.currentUser
+    val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
-    val sharedPref = remember { SharedPref(context) }
-    // Sample user data
-    val displayName = remember { mutableStateOf(user?.displayName ?: "user") }
-    val email = remember { mutableStateOf(user?.email ?: "user@example.com") }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Navigate away on successful logout
+    LaunchedEffect(uiState.logoutSuccess) {
+        if (uiState.logoutSuccess) {
+            onLogout()
+        }
+    }
+
+    // Show error in snackbar
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearError()
+        }
+    }
 
     Scaffold(
-        bottomBar = { BottomNavigationBar(navController) }
+        bottomBar = { BottomNavigationBar(navController) },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState) // Enable scrolling
+                .verticalScroll(scrollState)
                 .padding(padding)
-                .padding(bottom = bottomPadding.calculateBottomPadding()) // Handle bottom nav
+                .padding(bottom = bottomPadding.calculateBottomPadding())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
+            // ── Avatar + Name + Email ─────────────────────────────────────────
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
@@ -92,24 +111,26 @@ fun ProfileScreen(
                         )
                 ) {
                     Text(
-                        text = "${sharedPref.getFirstName()?.first()}${sharedPref.getLastName()?.first()}",
+                        text = uiState.avatarInitials,
                         style = MaterialTheme.typography.displayLarge,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+
                 Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
-                    text = "${displayName.value} ",
+                    text = uiState.displayName,
                     style = MaterialTheme.typography.headlineSmall
                 )
                 Text(
-                    text = email.value,
+                    text = uiState.email,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-
+            // ── Account Section ───────────────────────────────────────────────
             Text(
                 text = "Account",
                 style = MaterialTheme.typography.titleMedium,
@@ -120,7 +141,6 @@ fun ProfileScreen(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column {
-
                     ProfileItem(
                         icon = {
                             Icon(
@@ -159,7 +179,7 @@ fun ProfileScreen(
                 }
             }
 
-            // Settings Section
+            // ── Settings Section ──────────────────────────────────────────────
             Text(
                 text = "Settings",
                 style = MaterialTheme.typography.titleMedium,
@@ -183,7 +203,7 @@ fun ProfileScreen(
                     )
                     Divider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
                     ProfileItem(
-                        icon =  {
+                        icon = {
                             Icon(
                                 painter = painterResource(id = R.drawable.privacy_tips),
                                 contentDescription = "Privacy Policy",
@@ -197,8 +217,11 @@ fun ProfileScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+
+            // ── Logout Button ─────────────────────────────────────────────────
             Button(
-                onClick = onLogout,
+                onClick = { viewModel.logout() },
+                enabled = !uiState.isLoggingOut,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
@@ -208,11 +231,21 @@ fun ProfileScreen(
                     contentColor = MaterialTheme.colorScheme.onErrorContainer
                 )
             ) {
-                Text("Logout")
+                if (uiState.isLoggingOut) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Logout")
+                }
             }
         }
     }
 }
+
+// ── Reusable Profile Row Item ─────────────────────────────────────────────────
 
 @Composable
 fun ProfileItem(
@@ -228,7 +261,6 @@ fun ProfileItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Icon container that works for both Material and custom icons
         Box(
             modifier = Modifier.size(24.dp),
             contentAlignment = Alignment.Center

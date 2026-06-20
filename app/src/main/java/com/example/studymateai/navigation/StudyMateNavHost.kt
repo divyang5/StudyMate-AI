@@ -104,7 +104,7 @@ fun StudyMateNavHost(
                         popUpTo(0)
                     }
                 },
-                navController=navController
+                navController = navController
             )
         }
 
@@ -123,42 +123,88 @@ fun StudyMateNavHost(
                 }
             )
         ) { backStackEntry ->
-            val existingTextEncoded = backStackEntry.arguments?.getString(Routes.Scan.ARG_EXISTING_TEXT)
+            val existingTextEncoded =
+                backStackEntry.arguments?.getString(Routes.Scan.ARG_EXISTING_TEXT)
             val existingText = existingTextEncoded?.let { URLDecoder.decode(it, "UTF-8") }
 
             ScanScreen(
-                navController= navController,
-                initialText= existingText
+                navController = navController,
+                initialText = existingText
             )
         }
 
         composable(Routes.ChapterView.route) { backStackEntry ->
-            val chapterId = backStackEntry.arguments?.getString(Routes.ChapterView.ARG_CHAPTER_ID) ?: ""
+            val chapterId =
+                backStackEntry.arguments?.getString(Routes.ChapterView.ARG_CHAPTER_ID) ?: ""
 //            ChapterViewScreen(chapterId, navController)
         }
 
 
 
+//        composable(
+//            route = Routes.TextEdit.route,
+//            arguments = listOf(
+//                navArgument(Routes.TextEdit.EXTRACTED_TEXT) {
+//                    type = NavType.StringType
+//                }
+//            )
+//        ) { backStackEntry ->
+//            val encodedText =
+//                backStackEntry.arguments?.getString(Routes.TextEdit.EXTRACTED_TEXT) ?: ""
+//            val extractedText = try {
+//                URLDecoder.decode(encodedText, "UTF-8")
+//            } catch (e: Exception) {
+//                ""
+//            }
+//
+//            TextEditorScreen(
+//                extractedText = extractedText,
+//                navController = navController
+//            )
+//        }
+
         composable(
             route = Routes.TextEdit.route,
             arguments = listOf(
-                navArgument(Routes.TextEdit.EXTRACTED_TEXT) {
-                    type = NavType.StringType
-                }
+                navArgument("title") { defaultValue = "" },
+                navArgument("description") { defaultValue = "" },
+                navArgument("content") { defaultValue = "" },
             )
         ) { backStackEntry ->
-            val encodedText = backStackEntry.arguments?.getString(Routes.TextEdit.EXTRACTED_TEXT) ?: ""
+            val title = backStackEntry.arguments?.getString("title") ?: ""
+            val description = backStackEntry.arguments?.getString("description") ?: ""
+            val content = backStackEntry.arguments?.getString("content") ?: ""
             val extractedText = try {
-                URLDecoder.decode(encodedText, "UTF-8")
+                URLDecoder.decode(content, "UTF-8")
             } catch (e: Exception) {
                 ""
             }
-
             TextEditorScreen(
-                extractedText = extractedText,
+                title = URLDecoder.decode(title, "UTF-8"),
+                description = URLDecoder.decode(description, "UTF-8"),
+                extractedText = URLDecoder.decode(content, "UTF-8"),
                 navController = navController
             )
         }
+
+        composable(
+         route = Routes.TextEdit.route,
+         arguments = listOf(
+             navArgument("title")       { defaultValue = "" },
+             navArgument("description") { defaultValue = "" },
+             navArgument("content")     { defaultValue = "" },
+             navArgument("chapterId")   { nullable = true; defaultValue = null },
+         )) { backStackEntry ->
+                 val args = backStackEntry.arguments
+                 TextEditorScreen(
+                     title = URLDecoder.decode(args?.getString("title") ?: "", "UTF-8"),
+                     description = URLDecoder.decode(args?.getString("description") ?: "", "UTF-8"),
+                     extractedText = URLDecoder.decode(args?.getString("content") ?: "", "UTF-8"),
+                     chapterId = args?.getString("chapterId"),   // null when creating new
+                     navController = navController
+                 )
+             }
+
 
         composable(
             route = Routes.ChapterDetail.route,
