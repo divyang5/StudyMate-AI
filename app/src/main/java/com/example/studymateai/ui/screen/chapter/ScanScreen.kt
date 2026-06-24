@@ -41,6 +41,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -216,7 +217,16 @@ fun ScanScreen(
                 )
 
                 ScreenState.EDITING -> TopAppBar(
-                    title = { Text("Edit Document") },
+                    title = {
+                        Text(
+                            text = ("Edit Document"),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                            },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    ),
                     navigationIcon = {
                         IconButton(onClick = {
                             if (extractedText.value.isNotEmpty()) {

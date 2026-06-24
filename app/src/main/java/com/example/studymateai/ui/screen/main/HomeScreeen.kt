@@ -37,6 +37,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -147,8 +149,20 @@ fun HomeScreen(
                 )
         ) {
             // ── Sticky App Bar ───────────────────────────────────────────────
-            WelcomeHeader()
+//            WelcomeHeader()
 
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Studymate AI",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
             // ── Banner Ad ────────────────────────────────────────────────────
             adManager.BannerAd(
                 modifier = Modifier
@@ -347,16 +361,17 @@ fun WelcomeHeader() {
 
     Box(
         modifier          = Modifier
-            .fillMaxWidth()
+            .fillMaxWidth().padding(start = 10.dp)
             .background(MaterialTheme.colorScheme.background),
-        contentAlignment  = Alignment.Center
+        contentAlignment  = Alignment.CenterStart
     ) {
         Text(
-            text       = "Studymate",
-            style      = MaterialTheme.typography.headlineMedium,
+            text       = "Studymate AI",
+//            style      = MaterialTheme.typography.headlineMedium,
+            style      = MaterialTheme.typography.titleLarge,
             color      = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            fontFamily = mrDafoeFontFamily,
+//            fontWeight = FontWeight.Bold,
+//            fontFamily = mrDafoeFontFamily,
             modifier   = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
         )
     }

@@ -2,8 +2,6 @@ package com.example.studymateai.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
 
@@ -37,9 +35,9 @@ fun StudyMateAITheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) {
-        StudyMateDarkBlueColorScheme // Define your dark scheme
+        StudyMateDarkColorScheme // Define your dark scheme
     } else {
-        StudyMateLightBlueColorScheme
+        StudyMateLightColorScheme
     }
 
     MaterialTheme(

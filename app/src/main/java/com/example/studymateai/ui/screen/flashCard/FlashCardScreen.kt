@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +40,7 @@ import androidx.navigation.NavController
 import com.example.studymateai.BuildConfig
 import com.example.studymateai.ads.AdManager
 import com.example.studymateai.data.model.flashCard.Flashcard
+import com.example.studymateai.ui.screen.quizz.ErrorMessage
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.VerticalPager
 import com.google.accompanist.pager.rememberPagerState
@@ -157,7 +159,16 @@ fun FlashCardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Chapter Flashcards") },
+                title = {
+                    Text(
+                        text = ("Chapter Flashcards"),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")

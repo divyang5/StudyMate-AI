@@ -25,6 +25,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -233,7 +234,16 @@ fun QuizGenerationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (showResult.value) "Quiz Results" else "Question ${pagerState.currentPage + 1}/${quizQuestions.value.size}") },
+                title = {
+                    Text(
+                        text = (if (showResult.value) "Quiz Results" else "Question ${pagerState.currentPage + 1}/${quizQuestions.value.size}"),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
