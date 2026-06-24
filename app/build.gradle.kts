@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.studymateai"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -147,5 +147,5 @@ dependencies {
     //google admob
     implementation("com.google.android.gms:play-services-ads:24.5.0")
 
-
+    implementation("org.apache.poi:poi-ooxml:5.5.1")
 }
