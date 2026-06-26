@@ -13,11 +13,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// In LibraryUiState
 data class LibraryUiState(
     val chapters: List<Chapter> = emptyList(),
     val searchQuery: String = "",
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,   // ← add this
+    val error: String? = null
 )
+
+
 
 // Computed from UiState — no extra state needed
 val LibraryUiState.filteredChapters: List<Chapter>
@@ -40,6 +45,16 @@ class LibraryViewModel : ViewModel() {
         fetchChapters()
     }
 
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true) }
+            // re-fetch chapters from Firestore
+            fetchChapters()
+            Log.d("LibraryViewModel", "Refreshting chapter")
+
+            _uiState.update { it.copy(isRefreshing = false) }
+        }
+    }
     fun onSearchQueryChange(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
     }
@@ -57,8 +72,11 @@ class LibraryViewModel : ViewModel() {
             }
     }
 
+
     private fun fetchChapters() {
         val userId = auth.currentUser?.uid ?: return
+        _uiState.update { it.copy(isLoading = true, error = null) }
+
         viewModelScope.launch {
             try {
                 val snapshot = firestore.collection("chapters")
@@ -78,6 +96,7 @@ class LibraryViewModel : ViewModel() {
                         )
                     }
                     .sortedByDescending { it.createdAt }
+                Log.d("LibraryViewModel", "fetching chapter")
 
                 _uiState.update { it.copy(chapters = fetched, isLoading = false) }
             } catch (e: Exception) {

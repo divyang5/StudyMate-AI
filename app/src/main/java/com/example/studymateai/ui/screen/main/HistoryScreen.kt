@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +38,6 @@ import com.example.studymateai.ui.components.BottomNavigationBar
 import com.example.studymateai.ui.components.DeleteConfirmDialog
 import com.example.studymateai.ui.components.SwipeToDeleteContainer
 import com.example.studymateai.ui.screen.quizz.QuizHistoryCard
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun HistoryScreen(
@@ -45,7 +47,6 @@ fun HistoryScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Show errors via Snackbar
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
@@ -53,12 +54,17 @@ fun HistoryScreen(
         }
     }
 
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = uiState.isRefreshing,
+        onRefresh  = viewModel::refresh
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "Quiz History",
+                        text  = "Quiz History",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -68,18 +74,15 @@ fun HistoryScreen(
                 ),
             )
         },
-        bottomBar = { BottomNavigationBar(navController) },
-        snackbarHost = {
-            SnackbarHost(snackbarHostState) { data ->
-                Snackbar(snackbarData = data)
-            }
-        },
+        bottomBar    = { BottomNavigationBar(navController) },
+        snackbarHost = { SnackbarHost(snackbarHostState) { data -> Snackbar(snackbarData = data) } },
     ) { padding ->
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+                .pullRefresh(pullRefreshState)   // ← attach here
         ) {
             when {
                 uiState.isLoading -> {
@@ -88,29 +91,26 @@ fun HistoryScreen(
 
                 uiState.histories.isEmpty() -> {
                     Text(
-                        text = "No quiz history yet",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text     = "No quiz history yet",
+                        style    = MaterialTheme.typography.bodyMedium,
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.align(Alignment.Center),
                     )
                 }
 
                 else -> {
                     LazyColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        modifier            = Modifier.fillMaxWidth(),
+                        contentPadding      = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(
-                            items = uiState.histories,
-                            key = { it.id },          // stable keys for swipe-to-delete animations
-                        ) { history ->
+                        items(uiState.histories, key = { it.id }) { history ->
                             SwipeToDeleteContainer(
                                 onDelete = { viewModel.requestDelete(history) },
                             ) {
                                 QuizHistoryCard(
-                                    history = history,
-                                    onClick = { navController.navigate(Routes.QuizHistoryDetail.createRoute(history.id)) },
+                                    history  = history,
+                                    onClick  = { navController.navigate(Routes.QuizHistoryDetail.createRoute(history.id)) },
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -118,31 +118,22 @@ fun HistoryScreen(
                     }
                 }
             }
+
+            // Indicator always on top
+            PullRefreshIndicator(
+                refreshing = uiState.isRefreshing,
+                state      = pullRefreshState,
+                modifier   = Modifier.align(Alignment.TopCenter)
+            )
         }
     }
 
-    // Delete confirmation dialog — driven by uiState.pendingDelete
     uiState.pendingDelete?.let {
         DeleteConfirmDialog(
-            title = "Delete quiz history?",
-            message = "This quiz history will be permanently removed.",
+            title     = "Delete quiz history?",
+            message   = "This quiz history will be permanently removed.",
             onConfirm = viewModel::confirmDelete,
             onDismiss = viewModel::cancelDelete,
         )
-//        AlertDialog(
-//            onDismissRequest = viewModel::cancelDelete,
-//            title = { Text("Delete Quiz History") },
-//            text = { Text("Are you sure you want to delete this quiz history?") },
-//            confirmButton = {
-//                TextButton(onClick = viewModel::confirmDelete) {
-//                    Text("Delete", color = MaterialTheme.colorScheme.error)
-//                }
-//            },
-//            dismissButton = {
-//                TextButton(onClick = viewModel::cancelDelete) {
-//                    Text("Cancel")
-//                }
-//            },
-//        )
     }
 }

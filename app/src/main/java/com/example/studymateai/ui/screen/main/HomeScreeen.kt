@@ -128,9 +128,23 @@ fun HomeScreen(
     }
 
     Scaffold(
-        modifier      = Modifier.background(MaterialTheme.colorScheme.background),
-        bottomBar     = { BottomNavigationBar(navController) },
-        snackbarHost  = { SnackbarHost(snackbarHostState) }
+        modifier     = Modifier.background(MaterialTheme.colorScheme.background),
+        bottomBar    = { BottomNavigationBar(navController) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text  = "Studymate AI",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        }
     ) { padding ->
 
         if (uiState.isUserLoading) {
@@ -140,49 +154,27 @@ fun HomeScreen(
             return@Scaffold
         }
 
-        Column(
+        // ── Single Box owns both pullRefresh + indicator ─────────────────
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(
-                    top    = padding.calculateTopPadding(),
-                    bottom = padding.calculateBottomPadding() + 10.dp
-                )
+                .padding(padding)
+                .pullRefresh(pullRefreshState)
         ) {
-            // ── Sticky App Bar ───────────────────────────────────────────────
-//            WelcomeHeader()
-
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Studymate AI",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+            Column {
+                adManager.BannerAd(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
-            )
-            // ── Banner Ad ────────────────────────────────────────────────────
-            adManager.BannerAd(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-
-            // ── Scrollable Content + Pull Refresh ────────────────────────────
-            Box(modifier = Modifier.pullRefresh(pullRefreshState)) {
-                HomeContent(
-                    uiState       = uiState,
-                    navController = navController
-                )
-
-                PullRefreshIndicator(
-                    refreshing = uiState.isRefreshing,
-                    state      = pullRefreshState,
-                    modifier   = Modifier.align(Alignment.TopCenter)
-                )
+                HomeContent(uiState = uiState, navController = navController)
             }
+
+            PullRefreshIndicator(
+                refreshing = uiState.isRefreshing,
+                state      = pullRefreshState,
+                modifier   = Modifier.align(Alignment.TopCenter)
+            )
         }
     }
 }

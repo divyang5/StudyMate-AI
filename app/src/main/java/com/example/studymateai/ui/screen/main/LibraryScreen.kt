@@ -11,9 +11,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,7 +47,7 @@ import com.example.studymateai.ui.components.ChapterCard
 import com.example.studymateai.ui.components.DeleteConfirmDialog
 import com.example.studymateai.ui.components.SwipeToDeleteContainer
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun LibraryScreen(
     navController: NavController,
@@ -52,14 +55,17 @@ fun LibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val filteredChapters = uiState.filteredChapters
-
     var chapterToDelete by remember { mutableStateOf<Chapter?>(null) }
-    val context = LocalContext.current
+
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = uiState.isRefreshing,
+        onRefresh  = viewModel::refresh
+    )
 
     Scaffold(
         topBar = {
             LibraryTopBar(
-                searchQuery = uiState.searchQuery,
+                searchQuery       = uiState.searchQuery,
                 onSearchQueryChange = viewModel::onSearchQueryChange
             )
         },
@@ -69,26 +75,30 @@ fun LibraryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .pullRefresh(pullRefreshState)   // ← attach here
         ) {
             when {
                 uiState.isLoading -> LoadingState()
                 filteredChapters.isEmpty() -> EmptyState(searchQuery = uiState.searchQuery)
                 else -> ChapterList(
-                    chapters = filteredChapters,
-                    onChapterClick = { chapter ->
-                        navController.navigate(Routes.ChapterDetail.createRoute(chapter.id))
-                    },
-                    onDeleteRequest = { chapter ->
-                        chapterToDelete = chapter
-                    }
+                    chapters       = filteredChapters,
+                    onChapterClick = { navController.navigate(Routes.ChapterDetail.createRoute(it.id)) },
+                    onDeleteRequest = { chapterToDelete = it }
                 )
             }
+
+            // Indicator always on top
+            PullRefreshIndicator(
+                refreshing = uiState.isRefreshing,
+                state      = pullRefreshState,
+                modifier   = Modifier.align(Alignment.TopCenter)
+            )
         }
     }
 
     chapterToDelete?.let { chapter ->
         DeleteConfirmDialog(
-            title = "Delete chapter?",
+            title   = "Delete chapter?",
             message = "\"${chapter.title}\" will be permanently removed.",
             onConfirm = {
                 viewModel.deleteChapter(chapter.id)
@@ -98,7 +108,6 @@ fun LibraryScreen(
         )
     }
 }
-
 // ─── Sub-composables ─────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)

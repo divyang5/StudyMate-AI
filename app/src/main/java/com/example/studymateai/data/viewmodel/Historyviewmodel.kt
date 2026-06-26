@@ -19,6 +19,7 @@ data class HistoryUiState(
     val isLoading: Boolean = true,
     val histories: List<QuizHistory> = emptyList(),
     val error: String? = null,
+    val isRefreshing: Boolean = false,
     val pendingDelete: QuizHistory? = null,   // non-null = show confirm dialog
 )
 
@@ -34,6 +35,14 @@ class HistoryViewModel : ViewModel() {
         loadHistory()
     }
 
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true) }
+            // re-fetch chapters from Firestore
+            loadHistory()
+            _uiState.update { it.copy(isRefreshing = false) }
+        }
+    }
     // ─── Load ─────────────────────────────────────────────────────────────────
 
     fun loadHistory() {

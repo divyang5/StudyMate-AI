@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,9 @@ fun BottomNavigationBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    val itemPositions = remember { mutableStateMapOf<String, Pair<Float, Float>>() } // route → (x, width)
+    val selectedRoute = items.firstOrNull { it.route == currentRoute }?.route
+        ?: items.firstOrNull()?.route ?: return
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -119,28 +123,32 @@ fun BottomNavigationBar(navController: NavController) {
                         label = "scale"
                     )
 
+                    // Animate pill width
+                    val pillWidth by animateFloatAsState(
+                        targetValue = if (selected) itemPositions[selectedRoute]?.second ?: 1.05f else 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness    = Spring.StiffnessMediumLow
+                        ),
+                        label = "pillWidth"
+                    )
+
                     // Icon color animation
                     val iconColor by animateColorAsState(
                         targetValue = if (selected)
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                         else
                             Color.Black.copy(alpha = 0.5f),
-                        animationSpec = tween(durationMillis = 250),
+                        animationSpec = tween(durationMillis = 0),
                         label = "iconColor"
                     )
 
-                    // Selected pill background alpha
-                    val pillAlpha by animateFloatAsState(
-                        targetValue = if (selected) 1f else 0f,
-                        animationSpec = tween(durationMillis = 250),
-                        label = "pillAlpha"
-                    )
 
                     Box(
                         modifier = Modifier
                             .graphicsLayer {
                                 scaleX = scale
-                                scaleY = scale
+                                scaleY = pillWidth
                             }
                             .size(60.dp)
                             .clip(CircleShape)
