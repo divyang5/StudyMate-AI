@@ -1,6 +1,6 @@
 package com.example.studymateai.ui.screen
 
-import android.content.res.Configuration
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,337 +11,257 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.studymateai.R
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
+import com.example.studymateai.data.viewmodel.SignUpViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignUpScreen(
     onSignUpSuccess: () -> Unit,
     onLoginClick: () -> Unit,
+    viewModel: SignUpViewModel = viewModel()
 ) {
-    val firstNameState = remember { mutableStateOf("") }
-    val lastNameState = remember { mutableStateOf("") }
-    val emailState = remember { mutableStateOf("") }
-    val passwordState = remember { mutableStateOf("") }
-    val confirmPasswordState = remember { mutableStateOf("") }
-    val passwordErrorState = remember { mutableStateOf<String?>(null) }
-    val isLoading = remember { mutableStateOf(false) }
-    val showVerificationDialog = remember { mutableStateOf(false) } // Changed to verification dialog
-    val showErrorDialog = remember { mutableStateOf(false) }
-    val errorMessage = remember { mutableStateOf("") }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
 
-    val auth: FirebaseAuth = Firebase.auth
-    val firestore = Firebase.firestore
+    LaunchedEffect(uiState.generalError) {
+        uiState.generalError?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearGeneralError()
+        }
+    }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp),
+                .padding(padding)
+                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // App Logo/Title
+            Spacer(Modifier.height(48.dp))
+
             Image(
-                painter = painterResource(id = R.mipmap.ic_launcher_foreground),
-                contentDescription = "StudyMate AI Logo",
-                modifier = Modifier.size(120.dp)
+                painter = painterResource(R.mipmap.ic_launcher_foreground),
+                contentDescription = "StudyMate AI logo",
+                modifier = Modifier.size(100.dp)
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(Modifier.height(16.dp))
 
             Text(
-                text = "Signup",
+                text = "Create account",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.primary
             )
+            Text(
+                text = "Start your study journey",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(32.dp))
 
-            // Name Fields
+            // First + Last name row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = firstNameState.value,
-                    onValueChange = { firstNameState.value = it },
-                    label = { Text("First Name") },
+                    value = uiState.firstName,
+                    onValueChange = viewModel::onFirstNameChange,
+                    label = { Text("First name") },
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.weight(1f),
-                    singleLine = true
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Right) }),
+                    isError = uiState.firstNameError != null,
+                    supportingText = uiState.firstNameError?.let { { Text(it) } }
                 )
-
                 OutlinedTextField(
-                    value = lastNameState.value,
-                    onValueChange = { lastNameState.value = it },
-                    label = { Text("Last Name") },
+                    value = uiState.lastName,
+                    onValueChange = viewModel::onLastNameChange,
+                    label = { Text("Last name") },
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.weight(1f),
-                    singleLine = true
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                    isError = uiState.lastNameError != null,
+                    supportingText = uiState.lastNameError?.let { { Text(it) } }
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Email Field
             OutlinedTextField(
-                value = emailState.value,
-                onValueChange = { emailState.value = it },
+                value = uiState.email,
+                onValueChange = viewModel::onEmailChange,
                 label = { Text("Email") },
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email, imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                isError = uiState.emailError != null,
+                supportingText = uiState.emailError?.let { { Text(it) } }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Password Field
             OutlinedTextField(
-                value = passwordState.value,
-                onValueChange = { passwordState.value = it },
+                value = uiState.password,
+                onValueChange = viewModel::onPasswordChange,
                 label = { Text("Password") },
-                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                isError = passwordErrorState.value != null
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Confirm Password Field
-            OutlinedTextField(
-                value = confirmPasswordState.value,
-                onValueChange = { confirmPasswordState.value = it },
-                label = { Text("Re-Enter Password") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                isError = passwordErrorState.value != null,
-                supportingText = {
-                    if (passwordErrorState.value != null) {
-                        Text(text = passwordErrorState.value!!)
-                    }
-                }
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Sign Up Button
-            Button(
-                onClick = {
-                    if (firstNameState.value.isEmpty() || lastNameState.value.isEmpty()) {
-                        errorMessage.value = "Please enter your name"
-                        showErrorDialog.value = true
-                        return@Button
-                    }
-
-                    val error = validatePassword(passwordState.value, confirmPasswordState.value)
-                    passwordErrorState.value = error
-                    if (error == null) {
-                        isLoading.value = true
-                        createUserWithEmailAndPassword(
-                            auth = auth,
-                            email = emailState.value,
-                            password = passwordState.value,
-                            firstName = firstNameState.value,
-                            lastName = lastNameState.value,
-                            onSuccess = {
-                                isLoading.value = false
-                                showVerificationDialog.value = true // Show verification dialog
-                            },
-                            onError = { message ->
-                                isLoading.value = false
-                                errorMessage.value = message
-                                showErrorDialog.value = true
-                            },
-                            firestore = firestore
+                singleLine = true,
+                visualTransformation = if (passwordVisible) VisualTransformation.None
+                else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password, imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            painter = painterResource(
+                                id = if (passwordVisible) R.drawable.visibility_on
+                                else R.drawable.visibility_off
+                            ),
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password"
                         )
                     }
                 },
+                isError = uiState.passwordError != null,
+                supportingText = uiState.passwordError?.let { { Text(it) } }
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = uiState.confirmPassword,
+                onValueChange = viewModel::onConfirmPasswordChange,
+                label = { Text("Confirm password") },
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                enabled = !isLoading.value
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None
+                else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password, imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus(); viewModel.signUp() }
+                ),
+                trailingIcon = {
+                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        Icon(
+                            painter = painterResource(
+                                id = if (confirmPasswordVisible) R.drawable.visibility_on
+                                else R.drawable.visibility_off
+                            ),
+                            contentDescription = null
+                        )
+                    }
+                },
+                isError = uiState.confirmPasswordError != null,
+                supportingText = uiState.confirmPasswordError?.let { { Text(it) } }
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Button(
+                onClick = { focusManager.clearFocus(); viewModel.signUp() },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                enabled = !uiState.isLoading
             ) {
-                if (isLoading.value) {
+                if (uiState.isLoading) {
                     CircularProgressIndicator(
                         color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 } else {
-                    Text("Signup")
+                    Text("Create account", style = MaterialTheme.typography.labelLarge)
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Already have account - Login
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Already have an account?")
-                TextButton(onClick = onLoginClick) {
-                    Text("Login Now!")
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Already have an account?", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = onLoginClick) { Text("Login") }
             }
-        }
 
-        // Verification Required Dialog
-        if (showVerificationDialog.value) {
-            AlertDialog(
-                onDismissRequest = { showVerificationDialog.value = false },
-                title = { Text("Verify Your Email") },
-                text = {
-                    Column {
-                        Text("Your account has been created successfully!")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Please verify your email address before logging in.")
-                        Text("We've sent a verification email to ${emailState.value}")
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showVerificationDialog.value = false
-                            // Sign out the user immediately after signup
-                            auth.signOut()
-                            onLoginClick()
-                        }
-                    ) {
-                        Text("Go to Login")
-                    }
-                }
-            )
-        }
-
-        // Error Dialog
-        if (showErrorDialog.value) {
-            AlertDialog(
-                onDismissRequest = { showErrorDialog.value = false },
-                title = { Text("Sign Up Failed") },
-                text = { Text(errorMessage.value) },
-                confirmButton = {
-                    Button(
-                        onClick = { showErrorDialog.value = false }
-                    ) {
-                        Text("OK")
-                    }
-                }
-            )
+            Spacer(Modifier.height(48.dp))
         }
     }
-}
 
-// Updated Firebase function to send verification email
-private fun createUserWithEmailAndPassword(
-    auth: FirebaseAuth,
-    firestore: FirebaseFirestore,
-    email: String,
-    password: String,
-    firstName: String,
-    lastName: String,
-    onSuccess: () -> Unit,
-    onError: (String) -> Unit
-) {
-    auth.createUserWithEmailAndPassword(email, password)
-        .addOnCompleteListener { authTask ->
-            if (authTask.isSuccessful) {
-                // Create user document in Firestore
-                val user = hashMapOf(
-                    "uid" to authTask.result.user?.uid,
-                    "firstName" to firstName,
-                    "lastName" to lastName,
-                    "email" to email,
-                    "createdAt" to FieldValue.serverTimestamp()
-                )
-
-                firestore.collection("users")
-                    .document(authTask.result.user?.uid ?: "")
-                    .set(user)
-                    .addOnSuccessListener {
-                        // Send verification email
-                        authTask.result.user?.sendEmailVerification()
-                            ?.addOnCompleteListener { verificationTask ->
-                                if (verificationTask.isSuccessful) {
-                                    onSuccess()
-                                } else {
-                                    onError("Account created but verification email failed: ${verificationTask.exception?.message}")
-                                }
-                            } ?: onError("Failed to send verification email")
-                    }
-                    .addOnFailureListener { e ->
-                        onError(e.message ?: "Failed to create user profile")
-                    }
-            } else {
-                onError(authTask.exception?.message ?: "Unknown error occurred")
+    // Verification dialog
+    if (uiState.showVerificationDialog) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Check your email") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Account created successfully!")
+                    Text(
+                        "We sent a verification link to ${uiState.signUpSuccessEmail}. " +
+                                "Please verify before logging in.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.dismissVerificationDialog(); onLoginClick() },
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Go to login") }
             }
-        }
-}
-
-// Password validation function
-fun validatePassword(password: String, confirmPassword: String): String? {
-    if (password.length < 8) {
-        return "Password must be at least 8 characters"
-    }
-
-    if (!password.any { it.isDigit() }) {
-        return "Password must contain at least one digit"
-    }
-
-    if (!password.any { it.isLetter() }) {
-        return "Password must contain at least one letter"
-    }
-
-    if (password != confirmPassword) {
-        return "Passwords don't match"
-    }
-
-    return null
-}
-
-@Preview(showBackground = true)
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-fun SignUpScreenPreview() {
-    MaterialTheme {
-        SignUpScreen(
-            onSignUpSuccess = {},
-            onLoginClick = {},
         )
     }
 }

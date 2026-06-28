@@ -12,14 +12,14 @@ class SharedPref(context: Context?) {
     private val pref: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
 
     fun saveUserSession(uid: String
-//                        , firstName: String, lastName: String, email: String
+                        , firstName: String, lastName: String, email: String
     ) {
         pref.edit {
             putBoolean("IS_LOGGED_IN", true)
             putString("FIREBASE_UID", uid)
-//            putString("FIRST_NAME", firstName)
-//            putString("LAST_NAME", lastName)
-//            putString("EMAIL", email)
+            putString("FIRST_NAME", firstName)
+            putString("LAST_NAME", lastName)
+            putString("EMAIL", email)
         }
     }
 
@@ -53,4 +53,5 @@ class SharedPref(context: Context?) {
     fun setPrefString(key: String, value: String) {
         pref.edit { putString(key, value) }
     }
+
 }

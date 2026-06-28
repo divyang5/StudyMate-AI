@@ -1,6 +1,8 @@
 package com.example.studymateai.data.viewmodel
 
+
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -41,18 +43,46 @@ class ProfileViewModel(
 
     private fun loadUserProfile() {
         val user = auth.currentUser
-        val firstName = sharedPref.getFirstName().orEmpty()
-        val lastName  = sharedPref.getLastName().orEmpty()
+
+        // ── SharedPref null/empty debug logs ──────────────────────────────────
+        val rawFirstName = sharedPref.getFirstName()
+        val rawLastName  = sharedPref.getLastName()
+
+
+
+        // ── Safe fallback chain ──────────────────────────────────────────────
+        val firstName = rawFirstName?.trim().orEmpty()
+        val lastName  = rawLastName?.trim().orEmpty()
+
+        // Priority: SharedPref name → Firebase displayName → "User"
+        val displayName = when {
+            firstName.isNotEmpty() || lastName.isNotEmpty() ->
+                "$firstName $lastName".trim()
+            user?.displayName?.isNotBlank() == true ->
+                user.displayName!!
+            else -> "User"
+        }
 
         val initials = buildString {
             if (firstName.isNotEmpty()) append(firstName.first().uppercaseChar())
             if (lastName.isNotEmpty())  append(lastName.first().uppercaseChar())
-        }.ifEmpty { "U" }
+        }.ifEmpty {
+            // fallback initials from Firebase displayName
+            user?.displayName
+                ?.split(" ")
+                ?.filter { it.isNotEmpty() }
+                ?.take(2)
+                ?.joinToString("") { it.first().uppercaseChar().toString() }
+                .orEmpty()
+                .ifEmpty { "U" }
+        }
+
+        Log.d("PROFILEVIEWMODEL", "Final displayName = '$displayName', initials = '$initials'")
 
         _uiState.update { state ->
             state.copy(
-                displayName   = user?.displayName ?: "$firstName $lastName".trim().ifEmpty { "User" },
-                email         = user?.email ?: "",
+                displayName    = displayName,
+                email          = user?.email.orEmpty(),
                 avatarInitials = initials
             )
         }
@@ -67,8 +97,8 @@ class ProfileViewModel(
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
-                        isLoggingOut  = false,
-                        errorMessage  = e.message ?: "Logout failed. Please try again."
+                        isLoggingOut = false,
+                        errorMessage = e.message ?: "Logout failed. Please try again."
                     )
                 }
             }

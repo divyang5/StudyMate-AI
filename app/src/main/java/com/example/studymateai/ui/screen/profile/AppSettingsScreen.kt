@@ -1,8 +1,11 @@
 package com.example.studymateai.ui.screen.profile
 
+
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,23 +13,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material3.Divider
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -38,146 +41,143 @@ import com.example.studymateai.navigation.Routes
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppSettingsScreen(navController: NavController) {
-    val snackbarHostState = remember { SnackbarHostState() }
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = ("App Settings"),
+                        "App settings",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // About Section
-            item {
-                SettingsCategory(title = "About")
-                SettingItem(
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.quizz),
-                            contentDescription = "About",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    title = "About StudyMate AI",
-                    subtitle = "App version 1.0.0"
-                )
-
-                SettingItem(
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.privacy_tips),
-                            contentDescription = "Privacy Policy",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    title = "Privacy Policy",
-                    onClick = { navController.navigate(Routes.PrivacyPolicy.route) }
-                )
-
-                SettingItem(
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.language),
-                            contentDescription = "Language",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    title = "Language",
-                    subtitle = "English (US)",
-                )
-            }
+            item { Spacer(Modifier.height(8.dp)) }
 
             item {
-                Spacer(modifier = Modifier.height(40.dp))
+                SettingsSectionCard(title = "About") {
+                    SettingRow(
+                        icon = {
+                            Icon(
+                                painter = painterResource(R.drawable.quizz),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        },
+                        title = "About StudyMate AI",
+                        subtitle = "Version 1.0.0"
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+                    SettingRow(
+                        icon = {
+                            Icon(
+                                painter = painterResource(R.drawable.privacy_tips),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        },
+                        title = "Privacy policy",
+                        onClick = { navController.navigate(Routes.PrivacyPolicy.route) }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+                    SettingRow(
+                        icon = {
+                            Icon(
+                                painter = painterResource(R.drawable.language),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        },
+                        title = "Language",
+                        subtitle = "English (US)"
+                    )
+                }
             }
+
+            item { Spacer(Modifier.height(8.dp)) }
         }
     }
 }
 
 @Composable
-fun SettingsCategory(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
-    )
-    Divider()
+fun SettingsSectionCard(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+        )
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 1.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(content = content)
+        }
+    }
 }
 
 @Composable
-fun SettingItem(
+fun SettingRow(
     icon: @Composable () -> Unit,
     title: String,
     subtitle: String? = null,
-    onClick: (() -> Unit)? = null,
-    action: @Composable (() -> Unit)? = null
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = onClick != null, onClick = { onClick?.invoke() })
-            .padding(vertical = 16.dp),
+            .then(
+                if (onClick != null) Modifier.clickable(onClick = onClick)
+                else Modifier
+            )
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Icon container
-        Box(
-            modifier = Modifier
-                .padding(end = 16.dp)
-                .size(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            icon()
-        }
-
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge
-            )
+        Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) { icon() }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
             if (subtitle != null) {
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-
-        if (action != null) {
-            action()
-        } else if (onClick != null) {
+        if (onClick != null) {
             Icon(
-                imageVector = Icons.Default.ArrowForward,
-                contentDescription = "Go to $title",
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                Icons.Default.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
             )
         }
     }
-    Divider(thickness = 0.5.dp)
 }
 
