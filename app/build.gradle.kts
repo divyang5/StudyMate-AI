@@ -12,12 +12,12 @@ plugins {
 }
 
 android {
-    namespace = "com.example.studymateai"
+    namespace = "com.divyang.studymateai"
     compileSdk = 35
 
 
     defaultConfig {
-        applicationId = "com.example.studymateai"
+        applicationId = "com.divyang.studymateai"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

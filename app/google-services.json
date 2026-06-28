@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:175485432781:android:7f39c009cb27fef3c48a84",
+        "mobilesdk_app_id": "1:175485432781:android:406c33355645db38c48a84",
         "android_client_info": {
-          "package_name": "com.example.studymateai"
+          "package_name": "com.divyang.studymateai"
         }
       },
       "oauth_client": [],
