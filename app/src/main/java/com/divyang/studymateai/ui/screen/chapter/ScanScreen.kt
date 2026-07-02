@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -336,14 +335,26 @@ fun ScanScreen(
                         Spacer(Modifier.height(8.dp))
 
                         ScanSectionLabel("Content")
+//                        OutlinedTextField(
+//                            value = extractedText.value,
+//                            onValueChange = { extractedText.value = it },
+//                            modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 320.dp),
+//                            placeholder = { Text("Document text...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
+//                            isError = showError.value && extractedText.value.isEmpty(),
+//                            shape = RoundedCornerShape(14.dp),
+//                            maxLines = 20,
+//                            colors = scanFieldColors()
+//                        )
+
                         OutlinedTextField(
                             value = extractedText.value,
                             onValueChange = { extractedText.value = it },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 320.dp),
-                            placeholder = { Text("Document text...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),          // <- takes remaining space, scrolls internally, no outer scroll fighting it
+                            placeholder = { Text("Document text...") },
                             isError = showError.value && extractedText.value.isEmpty(),
                             shape = RoundedCornerShape(14.dp),
-                            maxLines = 20,
                             colors = scanFieldColors()
                         )
 
