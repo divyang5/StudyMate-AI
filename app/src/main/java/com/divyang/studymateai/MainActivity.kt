@@ -3,6 +3,7 @@ package com.divyang.studymateai
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.getValue
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 Scaffold(
+                    modifier = Modifier.imePadding(),
                     bottomBar = {
                         if (currentRoute in listOf(
                                 Routes.Home.route,

@@ -21,13 +21,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -36,17 +40,24 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -54,6 +65,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,6 +77,7 @@ import com.divyang.studymateai.data.viewmodel.ProfileViewModel
 import com.divyang.studymateai.navigation.Routes
 import com.divyang.studymateai.ui.components.BottomNavigationBar
 
+private const val DELETE_CONFIRMATION_WORD = "DELETE"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,8 +92,21 @@ fun ProfileScreen(
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Danger zone dialog state
+    var showDeleteWarningDialog by rememberSaveable { mutableStateOf(false) }
+    var showFinalDeleteDialog by rememberSaveable { mutableStateOf(false) }
+    var showPasswordDialog by rememberSaveable { mutableStateOf(false) }
+    var deleteConfirmationInput by rememberSaveable { mutableStateOf("") }
+    var passwordInput by rememberSaveable { mutableStateOf("") }
+    var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
+
     LaunchedEffect(uiState.logoutSuccess) {
         if (uiState.logoutSuccess) onLogout()
+    }
+    // Reuses the exact same navigation as a normal logout — sign out is
+    // already done in the ViewModel, this just moves the user to the login screen.
+    LaunchedEffect(uiState.accountDeleted) {
+        if (uiState.accountDeleted) onLogout()
     }
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
@@ -262,6 +290,227 @@ fun ProfileScreen(
             }
 
             Spacer(Modifier.height(24.dp))
+
+            // ── Danger Zone ────────────────────────────────────
+            ProfileSectionLabel("Danger Zone")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Permanently delete your account and all associated study data. This action cannot be undone.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(
+                        onClick = { showDeleteWarningDialog = true },
+                        enabled = !uiState.isDeletingAccount,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFA32D2D)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (uiState.isDeletingAccount) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFFA32D2D)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Deleting…")
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Delete Account")
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    // Step 1 — explain the consequences
+    if (showDeleteWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteWarningDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = Color(0xFFA32D2D)
+                )
+            },
+            title = { Text("Delete your account?") },
+            text = {
+                Text(
+                    "This will permanently delete your profile, study materials, chat history, " +
+                            "and all other data linked to your account from our servers. This action " +
+                            "cannot be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteWarningDialog = false
+                        deleteConfirmationInput = ""
+                        showFinalDeleteDialog = true
+                    }
+                ) {
+                    Text("Continue", color = Color(0xFFA32D2D))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteWarningDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Step 2 — type DELETE to confirm intent
+    if (showFinalDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showFinalDeleteDialog = false
+                deleteConfirmationInput = ""
+            },
+            title = { Text("Are you absolutely sure?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Type \"$DELETE_CONFIRMATION_WORD\" to confirm. This is your last chance to back out.")
+                    OutlinedTextField(
+                        value = deleteConfirmationInput,
+                        onValueChange = { deleteConfirmationInput = it },
+                        label = { Text(DELETE_CONFIRMATION_WORD) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showFinalDeleteDialog = false
+                        passwordInput = ""
+                        showPasswordDialog = true
+                    },
+                    enabled = deleteConfirmationInput == DELETE_CONFIRMATION_WORD
+                ) {
+                    Text(
+                        "Continue",
+                        color = if (deleteConfirmationInput == DELETE_CONFIRMATION_WORD) {
+                            Color(0xFFA32D2D)
+                        } else {
+                            Color(0xFFA32D2D).copy(alpha = 0.4f)
+                        }
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showFinalDeleteDialog = false
+                        deleteConfirmationInput = ""
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Step 3 — password required, verified BEFORE anything is deleted.
+    // Dialog stays open on wrong password so the user can just retry.
+    if (showPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!uiState.isDeletingAccount) {
+                    showPasswordDialog = false
+                    passwordInput = ""
+                    isPasswordVisible = false
+                }
+            },
+            title = { Text("Confirm your password") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("For your security, enter your password to permanently delete your account.")
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { passwordInput = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        enabled = !uiState.isDeletingAccount,
+                        visualTransformation = if (isPasswordVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { isPasswordVisible = !isPasswordVisible },
+                                enabled = !uiState.isDeletingAccount
+                            ) {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (isPasswordVisible) R.drawable.visibility_on
+                                        else R.drawable.visibility_off
+                                    ),
+                                    contentDescription = if (isPasswordVisible) "Hide password" else "Show password"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteAccount(passwordInput) },
+                    enabled = passwordInput.isNotBlank() && !uiState.isDeletingAccount
+                ) {
+                    if (uiState.isDeletingAccount) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Delete Permanently", color = Color(0xFFA32D2D))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showPasswordDialog = false
+                        passwordInput = ""
+                        isPasswordVisible = false
+                    },
+                    enabled = !uiState.isDeletingAccount
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Once the account is actually deleted, close the dialog so it doesn't
+    // briefly reappear while navigation to the login screen happens.
+    LaunchedEffect(uiState.accountDeleted) {
+        if (uiState.accountDeleted) {
+            showPasswordDialog = false
+            passwordInput = ""
+            isPasswordVisible = false
         }
     }
 }
