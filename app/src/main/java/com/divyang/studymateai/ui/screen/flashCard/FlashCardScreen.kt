@@ -13,19 +13,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -34,17 +28,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.divyang.studymateai.BuildConfig
 import com.divyang.studymateai.ads.AdManager
 import com.divyang.studymateai.data.model.flashCard.Flashcard
-import com.divyang.studymateai.ui.screen.quizz.ErrorMessage
+import com.divyang.studymateai.gemini.GeminiClient
+import com.divyang.studymateai.ui.components.AppColors
+import com.divyang.studymateai.ui.components.AppErrorCard
+import com.divyang.studymateai.ui.components.AppTopBar
+import com.divyang.studymateai.ui.components.ConfirmationDialog
+import com.divyang.studymateai.ui.components.CountSelectionDialog
+import com.divyang.studymateai.ui.components.RefreshActionButton
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.VerticalPager
 import com.google.accompanist.pager.rememberPagerState
-import com.google.ai.client.generativeai.GenerativeModel
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import com.google.gson.Gson
@@ -69,53 +66,53 @@ fun FlashCardScreen(
     val context = LocalContext.current
     val adManager = remember { AdManager(context) }
 
+
+    val showCountDialog = remember { mutableStateOf(true) }
+    val showRegenerateConfirm = remember { mutableStateOf(false) }
+    val flashcardCount = remember { mutableStateOf(12) }
+
     LaunchedEffect(Unit) {
         adManager.loadInterstitialAd()
     }
-    // Initialize Gemini
-    val generativeModel = remember {
-        GenerativeModel(
-            modelName = "gemini-2.5-flash",
-            apiKey = BuildConfig.GEMINI_API_KEY
-        )
-    }
-    // Define generateFlashcards function before LaunchedEffect
-    val generateFlashcards: () -> Unit = {
+
+    fun generateFlashcards(count: Int) {
         coroutineScope.launch {
             isLoadingFlashcards.value = true
             errorState.value = null
+            showCountDialog.value = false
 
             try {
                 val prompt = """
-                Analyze the following text and generate concise flashcards that summarize all the key points:
+                Analyze the following text and generate flashcards covering ONLY its most
+                important, high-yield concepts — do not create a flashcard for every minor
+                detail:
                 "${chapterContent.value}".
-                
+
+                Generate exactly $count flashcards. Prioritize the concepts a student would
+                most need to know to understand the chapter, in order of importance.
+
                 Each flashcard should have:
                 - A term/concept (short and clear)
-                - A definition/explanation (concise but comprehensive enough to understand the concept , slightly detailed )
-                
+                - A definition/explanation (concise but complete enough to understand the concept, slightly detailed)
+
                 Format as a JSON array where each flashcard has:
                 {
                     "term": "The term or concept",
                     "definition": "The definition or explanation"
                 }
-                
-                The flashcards should cover all the important concepts from the text in a way that
-                someone could understand the whole chapter by studying just these flashcards.
-                Generate as many flashcards as needed to properly cover the material - don't limit
-                the number, but keep each flashcard focused on one key concept.
+
                 Return ONLY the JSON array with no additional text or markdown formatting.
             """.trimIndent()
 
-                val response = generativeModel.generateContent(prompt)
-                Log.d("FlashcardResponse", "Raw response: ${response.text}")
+                val responseText = GeminiClient.generateContent(prompt)
+                Log.d("FlashcardResponse", "Raw response: $responseText")
 
-                val generatedFlashcards = parseFlashcardResponse(response.text ?: "")
+                val generatedFlashcards = parseFlashcardResponse(responseText)
                 Log.d("Flashcards", "Parsed ${generatedFlashcards.size} flashcards")
 
                 flashcards.value = generatedFlashcards
             } catch (e: Exception) {
-                errorState.value = "Failed to generate flashcards: ${e.localizedMessage}"
+                errorState.value = "Gemini couldn't generate flashcards right now. This is usually temporary — please try again."
                 Log.e("FlashcardGeneration", "Flashcard generation error", e)
             } finally {
                 isLoadingFlashcards.value = false
@@ -126,9 +123,7 @@ fun FlashCardScreen(
                             Log.d("AdsGeneration", "Ads generation from dismissed from on click")
                         },
                         onAdFailed = {
-
                             Log.d("AdsGeneration", "Ads generation from failed  1 from on click")
-
                         }
                     )
                 }
@@ -144,44 +139,25 @@ fun FlashCardScreen(
                 .await()
 
             chapterContent.value = document.getString("content") ?: ""
-
-            generateFlashcards()
         } catch (e: Exception) {
-            errorState.value = "Failed to load chapter content: ${e.localizedMessage}"
+            errorState.value = "We couldn't load this chapter's content. Please check your connection and try again."
             Log.e("FlashcardGeneration", "Error loading chapter content", e)
         } finally {
             isLoadingContent.value = false
         }
     }
 
-
-
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = ("Chapter Flashcards"),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
+            AppTopBar(
+                title = "Chapter Flashcards",
+                onBack = { navController.popBackStack() },
                 actions = {
-                    if (!isLoadingContent.value && !isLoadingFlashcards.value) {
-                        IconButton(
-                            onClick = { generateFlashcards() },
-                            enabled = chapterContent.value.isNotEmpty()
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Regenerate")
-                        }
+                    if (!isLoadingContent.value && !isLoadingFlashcards.value && !showCountDialog.value) {
+                        RefreshActionButton(
+                            enabled = chapterContent.value.isNotEmpty(),
+                            onClick = { showRegenerateConfirm.value = true }
+                        )
                     }
                 }
             )
@@ -193,29 +169,60 @@ fun FlashCardScreen(
                 .padding(padding)
         ) {
             when {
-                isLoadingContent.value || isLoadingFlashcards.value -> {
+                isLoadingContent.value -> {
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = AppColors.Purple)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = if (isLoadingContent.value)
-                                "Loading chapter content..."
-                            else
-                                "Generating flashcards..."
-                        )
+                        Text("Loading chapter content...")
                     }
                 }
 
                 errorState.value != null -> {
-                    ErrorMessage(
+                    AppErrorCard(
                         message = errorState.value!!,
-                        onRetry = { generateFlashcards() },
+                        onRetry = {
+                            errorState.value = null
+                            if (chapterContent.value.isEmpty()) {
+                                navController.popBackStack()
+                            } else {
+                                showCountDialog.value = true
+                            }
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
+                }
+
+                showCountDialog.value -> {
+                    CountSelectionDialog(
+                        title = "Number of Flashcards",
+                        description = "How many of the most important flashcards would you like to generate?",
+                        itemLabel = "flashcards",
+                        minValue = 5,
+                        maxValue = 25,
+                        initialValue = flashcardCount.value,
+                        isLoading = isLoadingFlashcards.value,
+                        onConfirm = { count ->
+                            flashcardCount.value = count
+                            generateFlashcards(count)
+                        },
+                        onDismiss = { navController.popBackStack() }
+                    )
+                }
+
+                isLoadingFlashcards.value -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(color = AppColors.Purple)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Generating ${flashcardCount.value} flashcards...")
+                    }
                 }
 
                 flashcards.value.isEmpty() -> {
@@ -226,8 +233,9 @@ fun FlashCardScreen(
                     ) {
                         Text("No flashcards generated")
                         Button(
-                            onClick = { generateFlashcards() },
-                            modifier = Modifier.padding(top = 16.dp)
+                            onClick = { showCountDialog.value = true },
+                            modifier = Modifier.padding(top = 16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Purple)
                         ) {
                             Text("Try Again")
                         }
@@ -235,55 +243,37 @@ fun FlashCardScreen(
                 }
 
                 else -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                    ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
                         SwipeableFlashcards(flashcards = flashcards.value)
                     }
                 }
+            }
+
+            if (showRegenerateConfirm.value) {
+                ConfirmationDialog(
+                    title = "Regenerate Flashcards?",
+                    message = "You'll lose your current set of flashcards. This can't be undone.",
+                    confirmText = "Regenerate",
+                    onConfirm = {
+                        showRegenerateConfirm.value = false
+                        flashcards.value = emptyList()
+                        showCountDialog.value = true
+                    },
+                    onDismiss = { showRegenerateConfirm.value = false }
+                )
             }
         }
     }
 }
 
-
-
 private fun parseFlashcardResponse(response: String): List<Flashcard> {
     return try {
-        val cleanResponse = response
-            .replace("```json", "")
-            .replace("```", "")
-            .trim()
-
+        val cleanResponse = GeminiClient.cleanJson(response)
         Log.d("CleanResponse", cleanResponse)
         Gson().fromJson(cleanResponse, Array<Flashcard>::class.java).toList()
     } catch (e: Exception) {
         Log.e("ParseError", "Failed to parse: $response", e)
         emptyList()
-    }
-}
-
-@Composable
-fun ErrorMessage(
-    message: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = message,
-            color = MaterialTheme.colorScheme.error,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onRetry) {
-            Text("Retry")
-        }
     }
 }
 
@@ -311,12 +301,10 @@ fun SwipeableFlashcards(flashcards: List<Flashcard>) {
         }
     }
 
-    // Add floating page indicator
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 32.dp)
-//            .align(Alignment.BottomCenter)
     ) {
         PageIndicatorDots(
             pageCount = flashcards.size,
@@ -343,7 +331,7 @@ fun PageIndicatorDots(
                     .padding(2.dp)
                     .background(
                         color = if (currentPage == index)
-                            MaterialTheme.colorScheme.primary
+                            AppColors.Purple
                         else
                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(4.dp)

@@ -2,58 +2,51 @@ package com.divyang.studymateai.ui.screen.quizz
 
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.view.HapticFeedbackConstantsCompat
 import androidx.navigation.NavController
-import com.divyang.studymateai.BuildConfig
-import com.divyang.studymateai.R
 import com.divyang.studymateai.ads.AdManager
 import com.divyang.studymateai.data.model.quizz.QuizQuestion
+import com.divyang.studymateai.gemini.GeminiClient
 import com.divyang.studymateai.navigation.Routes
-import com.divyang.studymateai.ui.screen.flashCard.ErrorMessage
+import com.divyang.studymateai.ui.components.AppErrorCard
+import com.divyang.studymateai.ui.components.AppTopBar
+import com.divyang.studymateai.ui.components.ConfirmationDialog
+import com.divyang.studymateai.ui.components.CountSelectionDialog
+import com.divyang.studymateai.ui.components.RefreshActionButton
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.HorizontalPager
 import com.google.accompanist.pager.rememberPagerState
-import com.google.ai.client.generativeai.GenerativeModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
@@ -85,20 +78,12 @@ fun QuizGenerationScreen(
     val view = LocalView.current
 
     val showQuestionCountDialog = remember { mutableStateOf(true) }
+    val showRegenerateConfirm = remember { mutableStateOf(false) }
     val questionCount = remember { mutableStateOf(10) }
     val pagerState = rememberPagerState()
 
     val context = LocalContext.current
     val adManager = remember { AdManager(context) }
-
-
-    // Initialize Gemini
-    val generativeModel = remember {
-        GenerativeModel(
-            modelName = "gemini-2.5-flash",
-            apiKey = BuildConfig.GEMINI_API_KEY
-        )
-    }
 
     LaunchedEffect(chapterId) {
         try {
@@ -109,7 +94,7 @@ fun QuizGenerationScreen(
 
             chapterContent.value = document.getString("content") ?: ""
         } catch (e: Exception) {
-            errorState.value = "Failed to load chapter content: ${e.localizedMessage}"
+            errorState.value = "We couldn't load this chapter's content. Please check your connection and try again."
             Log.e("QuizGeneration", "Error loading chapter content", e)
         } finally {
             isLoadingContent.value = false
@@ -119,12 +104,19 @@ fun QuizGenerationScreen(
         adManager.loadInterstitialAd()
     }
 
-     fun generateQuiz() {
-        coroutineScope.launch {
-            isLoadingQuiz.value = true  // This should show the loading screen
-            errorState.value = null
-            showQuestionCountDialog.value = false  // This closes the dialog
+    fun resetQuizState() {
+        selectedAnswers.clear()
+        isSubmitted.value = false
+        showResult.value = false
+        score.value = 0
+        quizQuestions.value = emptyList()
+    }
 
+    fun generateQuiz() {
+        coroutineScope.launch {
+            isLoadingQuiz.value = true
+            errorState.value = null
+            showQuestionCountDialog.value = false
 
             try {
                 val prompt = """
@@ -139,16 +131,12 @@ fun QuizGenerationScreen(
                 Return ONLY the JSON array with no additional text or markdown formatting.
             """.trimIndent()
 
-                val response = generativeModel.generateContent(prompt)
-//                Log.d("QuizResponse", "Raw response: ${response.text}")
-
-                val questions = parseQuizResponse(response.text ?: "")
-//                Log.d("QuizQuestions", "Parsed ${questions.size} questions")
+                val responseText = GeminiClient.generateContent(prompt)
+                val questions = parseQuizResponse(responseText)
 
                 quizQuestions.value = questions
-                showQuestionCountDialog.value = false
             } catch (e: Exception) {
-                errorState.value = "Failed to generate quiz: ${e.localizedMessage}"
+                errorState.value = "Gemini couldn't generate this quiz right now. This is usually temporary — please try again."
                 Log.e("QuizGeneration", "Quiz generation error", e)
             } finally {
                 isLoadingQuiz.value = false
@@ -159,19 +147,13 @@ fun QuizGenerationScreen(
                             Log.d("AdsGeneration", "Ads generation from dismissed from on click")
                         },
                         onAdFailed = {
-
                             Log.d("AdsGeneration", "Ads generation from failed  1 from on click")
-
                         }
                     )
                 }
             }
         }
     }
-
-
-
-
 
     fun selectAnswer(questionIndex: Int, selectedOption: String) {
         if (!isSubmitted.value) {
@@ -180,7 +162,6 @@ fun QuizGenerationScreen(
         }
     }
 
-    // Function to calculate score
     fun calculateScore(): Int {
         var correct = 0
         quizQuestions.value.forEachIndexed { index, question ->
@@ -220,7 +201,6 @@ fun QuizGenerationScreen(
         }
     }
 
-    // Function to submit quiz
     fun submitQuiz() {
         if (selectedAnswers.size == quizQuestions.value.size) {
             isSubmitted.value = true
@@ -230,36 +210,20 @@ fun QuizGenerationScreen(
         }
     }
 
-
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = (if (showResult.value) "Quiz Results" else "Question ${pagerState.currentPage + 1}/${quizQuestions.value.size}"),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
+            AppTopBar(
+                title = if (showResult.value)
+                    "Quiz Results"
+                else
+                    "Question ${pagerState.currentPage + 1}/${quizQuestions.value.size}",
+                onBack = { navController.popBackStack() },
                 actions = {
                     if (!isLoadingContent.value && !isLoadingQuiz.value && !showResult.value && !showQuestionCountDialog.value) {
-                        IconButton(
-                            onClick = { showQuestionCountDialog.value = true },
-                            enabled = chapterContent.value.isNotEmpty()
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.refresh),
-                                contentDescription = "Regenerate"
-                            )
-                        }
+                        RefreshActionButton(
+                            enabled = chapterContent.value.isNotEmpty(),
+                            onClick = { showRegenerateConfirm.value = true }
+                        )
                     }
                 }
             )
@@ -277,31 +241,43 @@ fun QuizGenerationScreen(
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = com.divyang.studymateai.ui.components.AppColors.Purple)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Loading chapter content...")
                     }
                 }
 
                 errorState.value != null -> {
-                    ErrorMessage(
+                    AppErrorCard(
                         message = errorState.value!!,
-                        onRetry = { generateQuiz() },
+                        onRetry = {
+                            errorState.value = null
+                            if (chapterContent.value.isEmpty()) {
+                                // content load failed — retry the whole screen
+                                navController.popBackStack()
+                                navController.navigate(Routes.QuizGen.createRoute(chapterId = chapterId))
+                            } else {
+                                generateQuiz()
+                            }
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
 
                 showQuestionCountDialog.value -> {
-                    QuestionCountDialog(
-                        minQuestions = 5,
-                        maxQuestions = 20,
-                        initialCount = questionCount.value,
-                        onCountSelected = { count ->
+                    CountSelectionDialog(
+                        title = "Number of Questions",
+                        description = "How many questions would you like to generate?",
+                        itemLabel = "questions",
+                        minValue = 5,
+                        maxValue = 20,
+                        initialValue = questionCount.value,
+                        isLoading = isLoadingQuiz.value,
+                        onConfirm = { count ->
                             questionCount.value = count
                             generateQuiz()
                         },
-                        onDismiss = { navController.popBackStack() },
-                        isLoading = isLoadingQuiz.value
+                        onDismiss = { navController.popBackStack() }
                     )
                 }
 
@@ -311,7 +287,7 @@ fun QuizGenerationScreen(
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = com.divyang.studymateai.ui.components.AppColors.Purple)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Generating ${questionCount.value} quiz questions...")
                     }
@@ -323,15 +299,11 @@ fun QuizGenerationScreen(
                         selectedAnswers = selectedAnswers,
                         score = score.value,
                         onRetake = {
-                            selectedAnswers.clear()
-                            isSubmitted.value = false
-                            showResult.value = false
+                            resetQuizState()
                             showQuestionCountDialog.value = true
                         },
                         onGoHome = {
-                            selectedAnswers.clear()
-                            isSubmitted.value = false
-                            showResult.value = false
+                            resetQuizState()
                             navController.navigate(Routes.Home.route)
                         }
                     )
@@ -352,101 +324,130 @@ fun QuizGenerationScreen(
                                 Text("Try Again")
                             }
                         }
-                    } else {
-                        Column(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                HorizontalPager(
-                                    count = quizQuestions.value.size,
-                                    state = pagerState,
+                    }else {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            HorizontalPager(
+                                count = quizQuestions.value.size,
+                                state = pagerState,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                            ) { page ->
+                                val question = quizQuestions.value[page]
+                                val randomColor = remember(page) {
+                                    val hue = Random.nextFloat() * 360f
+                                    Color.hsv(hue = hue, saturation = 0.7f, value = 0.8f, alpha = 0.05f)
+                                }
+                                Box(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth()
-                                ) { page ->
-                                    val question = quizQuestions.value[page]
-                                    val randomColor = remember(page) {
-                                        val hue = Random.nextFloat() * 360f
-                                        Color.hsv(
-                                            hue = hue,
-                                            saturation = 0.7f,
-                                            value = 0.8f,
-                                            alpha = 0.05f
-                                        )
-                                    }
+                                        .fillMaxSize()
+                                        .background(randomColor)
+                                ) {
+                                    QuizQuestionCard(
+                                        question = question,
+                                        selectedAnswer = selectedAnswers[page],
+                                        onAnswerSelected = { answer ->
+                                            selectAnswer(page, answer)
+                                            // FEATURE 1: Auto-scroll to next page after selecting an answer
+                                            if (page < quizQuestions.value.size - 1) {
+                                                coroutineScope.launch {
+                                                    delay(300) // Small delay so the user sees their selection register
+                                                    pagerState.animateScrollToPage(page + 1)
+                                                }
+                                            }
+                                        },
+                                        showCorrectAnswer = isSubmitted.value,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .align(Alignment.Center)
+                                            .padding(16.dp),
+                                        randomColor
+                                    )
+                                }
+                            }
+
+                            // FEATURE 2: Bottom Fast Scroller (Pagination Pad)
+                            val listState = rememberLazyListState()
+
+                            // Auto-scroll the indicator list so the active question number stays in view
+                            LaunchedEffect(pagerState.currentPage) {
+                                listState.animateScrollToItem(maxOf(0, pagerState.currentPage - 2))
+                            }
+
+                            LazyRow(
+                                state = listState,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(quizQuestions.value.size) { index ->
+                                    val isCurrent = pagerState.currentPage == index
+                                    val isAnswered = selectedAnswers.containsKey(index)
+
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(randomColor)
-                                    ) {
-                                        QuizQuestionCard(
-                                            question = question,
-                                            selectedAnswer = selectedAnswers[page],
-                                            onAnswerSelected = { answer ->
-                                                selectAnswer(page, answer)
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when {
+                                                    isCurrent -> com.divyang.studymateai.ui.components.AppColors.Purple // Current page
+                                                    isAnswered -> com.divyang.studymateai.ui.components.AppColors.Purple.copy(alpha = 0.5f) // Answered
+                                                    else -> Color.LightGray.copy(alpha = 0.5f) // Unanswered
+                                                }
+                                            )
+                                            .clickable {
+                                                coroutineScope.launch {
+                                                    pagerState.animateScrollToPage(index)
+                                                }
                                             },
-                                            showCorrectAnswer = isSubmitted.value,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .align(Alignment.Center)
-                                                .padding(16.dp)
-                                            ,
-                                            randomColor
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "${index + 1}",
+                                            color = if (isCurrent || isAnswered) Color.White else Color.Black
                                         )
                                     }
                                 }
+                            }
 
-                                Button(
-                                    onClick = { submitQuiz() },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    enabled = selectedAnswers.size == quizQuestions.value.size && !isSubmitted.value
-                                ) {
-                                    Text("Submit Quiz")
-                                }
+                            Button(
+                                onClick = { submitQuiz() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                enabled = selectedAnswers.size == quizQuestions.value.size && !isSubmitted.value,
+                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                    containerColor = com.divyang.studymateai.ui.components.AppColors.Purple
+                                )
+                            ) {
+                                Text("Submit Quiz")
                             }
                         }
                     }
                 }
             }
+
+            if (showRegenerateConfirm.value) {
+                ConfirmationDialog(
+                    title = "Regenerate Quiz?",
+                    message = "You'll lose your current set of questions and any answers you've selected. This can't be undone.",
+                    confirmText = "Regenerate",
+                    onConfirm = {
+                        showRegenerateConfirm.value = false
+                        resetQuizState()
+                        showQuestionCountDialog.value = true
+                    },
+                    onDismiss = { showRegenerateConfirm.value = false }
+                )
+            }
         }
     }
 }
-
-@Composable
-fun ErrorMessage(
-    message: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = message,
-            color = MaterialTheme.colorScheme.error,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onRetry) {
-            Text("Retry")
-        }
-    }
-}
-
 
 private fun parseQuizResponse(response: String): List<QuizQuestion> {
     return try {
-        val cleanResponse = response
-            .replace("```json", "")
-            .replace("```", "")
-            .trim()
-
+        val cleanResponse = GeminiClient.cleanJson(response)
         Log.d("CleanResponse", cleanResponse)
         Gson().fromJson(cleanResponse, Array<QuizQuestion>::class.java).toList()
     } catch (e: Exception) {
@@ -454,71 +455,3 @@ private fun parseQuizResponse(response: String): List<QuizQuestion> {
         emptyList()
     }
 }
-
-@Composable
-fun QuestionCountDialog(
-    minQuestions: Int = 5,
-    maxQuestions: Int = 20,
-    initialCount: Int,
-    onCountSelected: (Int) -> Unit,
-    onDismiss: () -> Unit,
-    isLoading: Boolean
-) {
-    var sliderValue by remember { mutableStateOf(initialCount.toFloat()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Number of Questions") },
-        text = {
-            Column {
-                Text("How many questions would you like to generate?")
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                ) {
-                    Slider(
-                        value = sliderValue,
-                        onValueChange = { newValue ->
-                            sliderValue = newValue
-                        },
-                        valueRange = minQuestions.toFloat()..maxQuestions.toFloat(),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoading
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("$minQuestions")
-                        Text(
-                            text = "${sliderValue.toInt()} questions",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text("$maxQuestions")
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onCountSelected(sliderValue.toInt())
-                },
-                enabled = !isLoading
-            ) {
-                Text("Generate")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isLoading
-            ) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-

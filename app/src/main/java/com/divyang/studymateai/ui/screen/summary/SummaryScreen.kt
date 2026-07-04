@@ -1,6 +1,7 @@
 package com.divyang.studymateai.ui.screen.summary
 
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,21 +11,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -33,14 +30,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.divyang.studymateai.BuildConfig
-import com.divyang.studymateai.R
-import com.divyang.studymateai.ui.screen.quizz.ErrorMessage
-import com.google.ai.client.generativeai.GenerativeModel
+import com.divyang.studymateai.gemini.GeminiClient
+import com.divyang.studymateai.ui.components.AppColors
+import com.divyang.studymateai.ui.components.AppErrorCard
+import com.divyang.studymateai.ui.components.AppTopBar
+import com.divyang.studymateai.ui.components.ConfirmationDialog
+import com.divyang.studymateai.ui.components.RefreshActionButton
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.launch
@@ -60,12 +59,7 @@ fun SummaryScreen(
     val errorState = remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
-    val generativeModel = remember {
-        GenerativeModel(
-            modelName = "gemini-2.5-flash",
-            apiKey = BuildConfig.GEMINI_API_KEY
-        )
-    }
+    val showRegenerateConfirm = remember { mutableStateOf(false) }
 
     LaunchedEffect(chapterId) {
         try {
@@ -76,19 +70,18 @@ fun SummaryScreen(
 
             chapterContent.value = document.getString("content") ?: ""
         } catch (e: Exception) {
-            errorState.value = "Failed to load chapter content: ${e.localizedMessage}"
+            errorState.value = "We couldn't load this chapter's content. Please check your connection and try again."
             Log.e("SummaryScreen", "Error loading content", e)
         } finally {
             isLoadingContent.value = false
         }
     }
 
-    // Generate summary when content loads
+    // Generate summary once when content first loads
     LaunchedEffect(chapterContent.value) {
-        if (chapterContent.value.isNotEmpty()) {
+        if (chapterContent.value.isNotEmpty() && summary.value.isEmpty()) {
             coroutineScope.launch {
                 generateSummary(
-                    generativeModel = generativeModel,
                     content = chapterContent.value,
                     summaryState = summary,
                     errorState = errorState,
@@ -100,42 +93,15 @@ fun SummaryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = ("Chapter Summary"),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
+            AppTopBar(
+                title = "Chapter Summary",
+                onBack = { navController.popBackStack() },
                 actions = {
-                    if (summary.value.isNotEmpty()) {
-                        IconButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    generateSummary(
-                                        generativeModel = generativeModel,
-                                        content = chapterContent.value,
-                                        summaryState = summary,
-                                        errorState = errorState,
-                                        isLoading = isGeneratingSummary
-                                    )
-                                }
-                            }
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.refresh),
-                                contentDescription = "Regenerate"
-                            )
-                        }
+                    if (summary.value.isNotEmpty() && !isGeneratingSummary.value) {
+                        RefreshActionButton(
+                            enabled = chapterContent.value.isNotEmpty(),
+                            onClick = { showRegenerateConfirm.value = true }
+                        )
                     }
                 }
             )
@@ -156,22 +122,27 @@ fun SummaryScreen(
                 }
 
                 errorState.value != null -> {
-                    ErrorMessage(
+                    AppErrorCard(
                         message = errorState.value!!,
                         onRetry = {
                             coroutineScope.launch {
                                 if (chapterContent.value.isEmpty()) {
-                                    // Retry content loading
                                     isLoadingContent.value = true
                                     errorState.value = null
-                                    val document = firestore.collection("chapters")
-                                        .document(chapterId)
-                                        .get()
-                                        .await()
-                                    chapterContent.value = document.getString("content") ?: ""
+                                    try {
+                                        val document = firestore.collection("chapters")
+                                            .document(chapterId)
+                                            .get()
+                                            .await()
+                                        chapterContent.value = document.getString("content") ?: ""
+                                    } catch (e: Exception) {
+                                        errorState.value = "We couldn't load this chapter's content. Please check your connection and try again."
+                                        Log.e("SummaryScreen", "Error loading content", e)
+                                    } finally {
+                                        isLoadingContent.value = false
+                                    }
                                 } else {
                                     generateSummary(
-                                        generativeModel = generativeModel,
                                         content = chapterContent.value,
                                         summaryState = summary,
                                         errorState = errorState,
@@ -196,14 +167,14 @@ fun SummaryScreen(
                             onClick = {
                                 coroutineScope.launch {
                                     generateSummary(
-                                        generativeModel = generativeModel,
                                         content = chapterContent.value,
                                         summaryState = summary,
                                         errorState = errorState,
                                         isLoading = isGeneratingSummary
                                     )
                                 }
-                            }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Purple)
                         ) {
                             Text("Generate Summary")
                         }
@@ -219,17 +190,40 @@ fun SummaryScreen(
                     )
                 }
             }
+
+            if (showRegenerateConfirm.value) {
+                ConfirmationDialog(
+                    title = "Regenerate Summary?",
+                    message = "This will replace your current summary. This can't be undone.",
+                    confirmText = "Regenerate",
+                    onConfirm = {
+                        showRegenerateConfirm.value = false
+                        coroutineScope.launch {
+                            generateSummary(
+                                content = chapterContent.value,
+                                summaryState = summary,
+                                errorState = errorState,
+                                isLoading = isGeneratingSummary
+                            )
+                        }
+                    },
+                    onDismiss = { showRegenerateConfirm.value = false }
+                )
+            }
         }
     }
 }
+
 @Composable
 fun SummaryContent(
     summary: String,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        modifier = modifier
     ) {
         Column(
             modifier = Modifier
@@ -238,19 +232,21 @@ fun SummaryContent(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "Key Summary",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                text = "KEY SUMMARY",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.6.sp),
+                color = AppColors.Purple,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = summary,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                lineHeight = 24.sp
             )
         }
     }
 }
+
 @Composable
 fun LoadingState(message: String) {
     Column(
@@ -258,14 +254,13 @@ fun LoadingState(message: String) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        CircularProgressIndicator()
+        CircularProgressIndicator(color = AppColors.Purple)
         Spacer(modifier = Modifier.height(16.dp))
         Text(message)
     }
 }
 
 private suspend fun generateSummary(
-    generativeModel: GenerativeModel,
     content: String,
     summaryState: MutableState<String>,
     errorState: MutableState<String?>,
@@ -293,13 +288,12 @@ private suspend fun generateSummary(
             - Third main idea
         """.trimIndent()
 
-        val response = generativeModel.generateContent(prompt)
-        summaryState.value = response.text?.trim() ?: "No summary generated"
+        val responseText = GeminiClient.generateContent(prompt)
+        summaryState.value = responseText.trim().ifEmpty { "No summary generated" }
     } catch (e: Exception) {
-        errorState.value = "Failed to generate summary: ${e.localizedMessage}"
+        errorState.value = "Gemini couldn't generate a summary right now. This is usually temporary — please try again."
         Log.e("SummaryScreen", "Generation error", e)
     } finally {
         isLoading.value = false
     }
 }
-
