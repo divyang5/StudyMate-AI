@@ -5,9 +5,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.divyang.studymateai.data.model.chapters.Chapter
+import com.divyang.studymateai.utils.AuthEventBus
 import com.google.firebase.Firebase
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -69,7 +71,12 @@ class HomeViewModel : ViewModel() {
     }
 
     private suspend fun loadUser() {
-        val userId = auth.currentUser?.uid ?: return
+        val userId = auth.currentUser?.uid
+        if (userId == null) {
+            _uiState.update { it.copy(isUserLoading = false) }
+            AuthEventBus.notifySessionExpired()
+            return
+        }
         try {
             val doc = firestore.collection("users").document(userId).get().await()
             val first = doc.getString("firstName") ?: ""
@@ -79,13 +86,24 @@ class HomeViewModel : ViewModel() {
                 it.copy(firstName = first, lastName = last, isUserLoading = false)
             }
 
-            // Keep Firebase Auth display name in sync
+
             val request = UserProfileChangeRequest.Builder()
                 .setDisplayName("$first $last")
                 .build()
             auth.currentUser?.updateProfile(request)?.await()
 
             Log.d(TAG, "User loaded: $first $last")
+        } catch (e: FirebaseFirestoreException) {
+            if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED ||
+                e.code == FirebaseFirestoreException.Code.UNAUTHENTICATED
+            ) {
+                Log.e(TAG, "Session invalid while fetching user", e)
+                _uiState.update { it.copy(isUserLoading = false) }
+                AuthEventBus.notifySessionExpired()
+            } else {
+                Log.e(TAG, "Firestore error fetching user", e)
+                _uiState.update { it.copy(isUserLoading = false, error = "Failed to load user data") }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching user", e)
             _uiState.update { it.copy(isUserLoading = false, error = "Failed to load user data") }
@@ -93,7 +111,12 @@ class HomeViewModel : ViewModel() {
     }
 
     private suspend fun loadChapters() {
-        val userId = auth.currentUser?.uid ?: return
+        val userId = auth.currentUser?.uid
+        if (userId == null) {
+            _uiState.update { it.copy(isChaptersLoading = false) }
+            AuthEventBus.notifySessionExpired()
+            return
+        }
         _uiState.update { it.copy(isChaptersLoading = true) }
         try {
             val snapshot = firestore.collection("chapters")
@@ -118,6 +141,19 @@ class HomeViewModel : ViewModel() {
 
             _uiState.update { it.copy(chapters = list, isChaptersLoading = false) }
             Log.d(TAG, "Chapters loaded: ${list.size}")
+        } catch (e: FirebaseFirestoreException) {
+            if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED ||
+                e.code == FirebaseFirestoreException.Code.UNAUTHENTICATED
+            ) {
+                Log.e(TAG, "Session invalid while fetching chapters", e)
+                _uiState.update { it.copy(isChaptersLoading = false) }
+                AuthEventBus.notifySessionExpired()
+            } else {
+                Log.e(TAG, "Firestore error fetching chapters", e)
+                _uiState.update {
+                    it.copy(isChaptersLoading = false, error = "Failed to load chapters")
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching chapters", e)
             _uiState.update {

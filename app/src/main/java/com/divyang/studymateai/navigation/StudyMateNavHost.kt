@@ -1,6 +1,7 @@
 package com.divyang.studymateai.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -15,8 +16,6 @@ import com.divyang.studymateai.ui.screen.ForgotPasswordScreen
 import com.divyang.studymateai.ui.screen.LoginScreen
 import com.divyang.studymateai.ui.screen.SignUpScreen
 import com.divyang.studymateai.ui.screen.chapter.ChapterDetailScreen
-import com.divyang.studymateai.ui.screen.chapter.ScanScreen
-import com.divyang.studymateai.ui.screen.chapter.TextEditorScreen
 import com.divyang.studymateai.ui.screen.flashCard.FlashCardScreen
 import com.divyang.studymateai.ui.screen.main.HistoryScreen
 import com.divyang.studymateai.ui.screen.main.HomeScreen
@@ -29,8 +28,11 @@ import com.divyang.studymateai.ui.screen.profile.EditProfileScreen
 import com.divyang.studymateai.ui.screen.profile.PrivacyPolicyScreen
 import com.divyang.studymateai.ui.screen.quizz.QuizGenerationScreen
 import com.divyang.studymateai.ui.screen.quizz.QuizHistoryDetailScreen
+import com.divyang.studymateai.ui.screen.scan.ScanScreen
+import com.divyang.studymateai.ui.screen.scan.TextEditorScreen
 import com.divyang.studymateai.ui.screen.summary.SummaryScreen
-import com.google.firebase.auth.FirebaseAuth
+import com.divyang.studymateai.utils.AuthEvent
+import com.divyang.studymateai.utils.AuthEventBus
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import java.net.URLDecoder
@@ -38,13 +40,25 @@ import java.net.URLDecoder
 @Composable
 fun StudyMateNavHost(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = Routes.getStartDestination(Firebase.auth.currentUser != null),
     modifier: Modifier
 ) {
-    val auth: FirebaseAuth = Firebase.auth
-    val context=LocalContext.current
-    val sharedPref = remember { SharedPref(context) }
 
+    val context = LocalContext.current
+    val sharedPref = remember { SharedPref(context) }
+    val auth = remember { Firebase.auth }
+
+
+    val startDestination = Routes.getStartDestination(sharedPref.isLoggedIn())
+
+    LaunchedEffect(Unit) {
+        AuthEventBus.events.collect { event ->
+            if (event is AuthEvent.SessionExpired) {
+                navController.navigate(Routes.Login.route) {
+                    popUpTo(0)
+                }
+            }
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -139,29 +153,6 @@ fun StudyMateNavHost(
 //            ChapterViewScreen(chapterId, navController)
         }
 
-
-
-//        composable(
-//            route = Routes.TextEdit.route,
-//            arguments = listOf(
-//                navArgument(Routes.TextEdit.EXTRACTED_TEXT) {
-//                    type = NavType.StringType
-//                }
-//            )
-//        ) { backStackEntry ->
-//            val encodedText =
-//                backStackEntry.arguments?.getString(Routes.TextEdit.EXTRACTED_TEXT) ?: ""
-//            val extractedText = try {
-//                URLDecoder.decode(encodedText, "UTF-8")
-//            } catch (e: Exception) {
-//                ""
-//            }
-//
-//            TextEditorScreen(
-//                extractedText = extractedText,
-//                navController = navController
-//            )
-//        }
 
         composable(
             route = Routes.TextEdit.route,

@@ -1,7 +1,5 @@
 package com.divyang.studymateai.ui.screen.main
 
-import android.Manifest
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,8 +22,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,70 +32,38 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.divyang.studymateai.R
 import com.divyang.studymateai.ads.AdManager
 import com.divyang.studymateai.data.viewmodel.HomeUiState
 import com.divyang.studymateai.data.viewmodel.HomeViewModel
 import com.divyang.studymateai.navigation.Routes
 import com.divyang.studymateai.ui.components.BottomNavigationBar
 import com.divyang.studymateai.ui.components.ChapterCard
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
-
-@OptIn(
-    ExperimentalMaterial3Api::class,
-    ExperimentalPermissionsApi::class,
-    ExperimentalMaterialApi::class
-)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun HomeScreen(
     navController: NavController,
     viewModel: HomeViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle() // Works perfectly now
     val snackbarHostState = remember { SnackbarHostState() }
     val adManager = remember { AdManager(context) }
-
-    // ── Permissions ──────────────────────────────────────────────────────────
-    val galleryPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-        Manifest.permission.READ_MEDIA_IMAGES
-    else
-        Manifest.permission.READ_EXTERNAL_STORAGE
-
-    val cameraPermission  = rememberPermissionState(Manifest.permission.CAMERA)
-    val galleryPermission2 = rememberPermissionState(galleryPermission)
-
-    var showPermissionDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        if (!cameraPermission.status.isGranted || !galleryPermission2.status.isGranted) {
-            showPermissionDialog = true
-        }
-    }
 
     // ── Error Snackbar ───────────────────────────────────────────────────────
     LaunchedEffect(uiState.error) {
@@ -109,23 +73,10 @@ fun HomeScreen(
         }
     }
 
-    // ── Pull-to-Refresh ──────────────────────────────────────────────────────
     val pullRefreshState = rememberPullRefreshState(
         refreshing = uiState.isRefreshing,
         onRefresh  = viewModel::refresh
     )
-
-    // ── Permission Dialog ────────────────────────────────────────────────────
-    if (showPermissionDialog) {
-        PermissionDialog(
-            onDismiss = { showPermissionDialog = false },
-            onConfirm = {
-                cameraPermission.launchPermissionRequest()
-                galleryPermission2.launchPermissionRequest()
-                showPermissionDialog = false
-            }
-        )
-    }
 
     Scaffold(
         modifier     = Modifier.background(MaterialTheme.colorScheme.background),
@@ -146,7 +97,6 @@ fun HomeScreen(
             )
         }
     ) { padding ->
-
         if (uiState.isUserLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -154,7 +104,6 @@ fun HomeScreen(
             return@Scaffold
         }
 
-        // ── Single Box owns both pullRefresh + indicator ─────────────────
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -178,7 +127,6 @@ fun HomeScreen(
         }
     }
 }
-
 // ─── Home Content ────────────────────────────────────────────────────────────
 
 @Composable
@@ -191,7 +139,6 @@ private fun HomeContent(
         verticalArrangement = Arrangement.spacedBy(24.dp),
         state               = rememberLazyListState()
     ) {
-        // Quick Actions header + row
         item {
             Column(
                 modifier            = Modifier.padding(horizontal = 16.dp),
@@ -203,7 +150,6 @@ private fun HomeContent(
             }
         }
 
-        // Chapters list
         when {
             uiState.isChaptersLoading -> item {
                 CircularProgressIndicator(
@@ -241,7 +187,6 @@ private data class QuickAction(val label: String, val route: () -> String)
 
 private val quickActions = listOf(
     "Scan Document"
-    // "Create Quiz", "Make Flashcards", "Generate Summary"  ← uncomment when ready
 )
 
 @Composable
@@ -302,7 +247,7 @@ fun QuickActionCard(text: String, onClick: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector     = Icons.Default.Add,   // swap per action if needed
+                    imageVector     = Icons.Default.Add,
                     contentDescription = text,
                     tint            = MaterialTheme.colorScheme.primary,
                     modifier        = Modifier.size(24.dp)
@@ -317,55 +262,3 @@ fun QuickActionCard(text: String, onClick: () -> Unit) {
         }
     }
 }
-
-@Composable
-fun PermissionDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title            = { Text("Permissions Needed") },
-        text             = { Text("StudyMate AI needs camera and gallery access to scan documents.") },
-        confirmButton    = {
-            Button(onClick = onConfirm) { Text("Allow") }
-        },
-        dismissButton    = {
-            TextButton(onClick = onDismiss) { Text("Not Now") }
-        }
-    )
-}
-
-@Composable
-fun WelcomeHeader() {
-    val fontProvider = GoogleFont.Provider(
-        providerAuthority = "com.google.android.gms.fonts",
-        providerPackage   = "com.google.android.gms",
-        certificates      = R.array.com_google_android_gms_fonts_certs
-    )
-    val mrDafoeFontFamily = FontFamily(
-        Font(
-            googleFont    = GoogleFont("Mr Dafoe"),
-            fontProvider  = fontProvider,
-            weight        = FontWeight.Bold
-        )
-    )
-
-    Box(
-        modifier          = Modifier
-            .fillMaxWidth().padding(start = 10.dp)
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment  = Alignment.CenterStart
-    ) {
-        Text(
-            text       = "Studymate AI",
-//            style      = MaterialTheme.typography.headlineMedium,
-            style      = MaterialTheme.typography.titleLarge,
-            color      = MaterialTheme.colorScheme.primary,
-//            fontWeight = FontWeight.Bold,
-//            fontFamily = mrDafoeFontFamily,
-            modifier   = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
-        )
-    }
-}
-

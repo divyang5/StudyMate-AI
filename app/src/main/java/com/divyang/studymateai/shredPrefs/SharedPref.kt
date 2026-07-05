@@ -24,13 +24,7 @@ class SharedPref(context: Context?) {
     }
 
     fun clearUserSession() {
-        pref.edit {
-            remove("IS_LOGGED_IN")
-            remove("FIREBASE_UID")
-            remove("FIRST_NAME")
-            remove("LAST_NAME")
-            remove("EMAIL")
-        }
+        pref.edit { clear() }
     }
 
     fun getFirstName(): String? = pref.getString("FIRST_NAME", null)

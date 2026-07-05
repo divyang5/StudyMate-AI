@@ -1,8 +1,9 @@
-package com.divyang.studymateai.ui.screen.chapter
+package com.divyang.studymateai.ui.screen.scan
 
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.graphics.pdf.PdfRenderer
@@ -10,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -69,9 +71,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.divyang.studymateai.R
+import com.divyang.studymateai.ui.components.PermissionDialog
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
@@ -108,6 +112,15 @@ fun ScanScreen(
     val showError          = remember { mutableStateOf(false) }
     val errorMessage       = remember { mutableStateOf<String?>(null) }
     val showSuccess        = remember { mutableStateOf(false) }
+
+
+    // Permission tracking states
+    val hasRequestedCamera = remember { mutableStateOf(false) }
+    val hasRequestedGallery = remember { mutableStateOf(false) }
+    val showPermissionDialog = remember { mutableStateOf(false) }
+    val permissionMessage = remember { mutableStateOf("") }
+    val permissionConfirmText = remember { mutableStateOf("Allow") }
+    val onPermissionConfirm = remember { mutableStateOf<() -> Unit>({}) }
 
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
     val galleryPermission = rememberPermissionState(
@@ -264,9 +277,29 @@ fun ScanScreen(
                                     title       = "Take Photo",
                                     subtitle    = "Scan with camera",
                                     onClick     = {
-                                        if (cameraPermission.status.isGranted)
+                                        if (cameraPermission.status.isGranted) {
                                             currentScreenState.value = ScreenState.SCANNING
-                                        else cameraPermission.launchPermissionRequest()
+                                        } else {
+                                            if (cameraPermission.status.shouldShowRationale) {
+                                                permissionMessage.value = "StudyMate AI needs camera access to scan documents."
+                                                permissionConfirmText.value = "Allow"
+                                                onPermissionConfirm.value = { cameraPermission.launchPermissionRequest() }
+                                                showPermissionDialog.value = true
+                                            } else if (hasRequestedCamera.value) {
+                                                permissionMessage.value = "Camera permission is permanently denied. Please enable it in App Settings to scan documents."
+                                                permissionConfirmText.value = "Open Settings"
+                                                onPermissionConfirm.value = {
+                                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                        data = Uri.fromParts("package", context.packageName, null)
+                                                    }
+                                                    context.startActivity(intent)
+                                                }
+                                                showPermissionDialog.value = true
+                                            } else {
+                                                hasRequestedCamera.value = true
+                                                cameraPermission.launchPermissionRequest()
+                                            }
+                                        }
                                     }
                                 )
                                 ScanDivider()
@@ -277,9 +310,29 @@ fun ScanScreen(
                                     title    = "Choose from Gallery",
                                     subtitle = "Pick an image file",
                                     onClick  = {
-                                        if (galleryPermission.status.isGranted)
+                                        if (galleryPermission.status.isGranted) {
                                             galleryLauncher.launch("image/*")
-                                        else galleryPermission.launchPermissionRequest()
+                                        } else {
+                                            if (galleryPermission.status.shouldShowRationale) {
+                                                permissionMessage.value = "StudyMate AI needs gallery access to select document images."
+                                                permissionConfirmText.value = "Allow"
+                                                onPermissionConfirm.value = { galleryPermission.launchPermissionRequest() }
+                                                showPermissionDialog.value = true
+                                            } else if (hasRequestedGallery.value) {
+                                                permissionMessage.value = "Gallery permission is permanently denied. Please enable it in App Settings to choose images."
+                                                permissionConfirmText.value = "Open Settings"
+                                                onPermissionConfirm.value = {
+                                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                        data = Uri.fromParts("package", context.packageName, null)
+                                                    }
+                                                    context.startActivity(intent)
+                                                }
+                                                showPermissionDialog.value = true
+                                            } else {
+                                                hasRequestedGallery.value = true
+                                                galleryPermission.launchPermissionRequest()
+                                            }
+                                        }
                                     }
                                 )
                                 ScanDivider()
@@ -479,6 +532,17 @@ fun ScanScreen(
             confirmBg    = Color(0xFFE1F5EE),
             onConfirm    = { showSuccess.value = false; navController.popBackStack() },
             onDismiss    = { showSuccess.value = false }
+        )
+    }
+    if (showPermissionDialog.value) {
+        PermissionDialog(
+            text = permissionMessage.value,
+            confirmText = permissionConfirmText.value,
+            onDismiss = { showPermissionDialog.value = false },
+            onConfirm = {
+                showPermissionDialog.value = false
+                onPermissionConfirm.value.invoke()
+            }
         )
     }
 }
@@ -690,3 +754,4 @@ private fun processImageForText(
             Log.e("ScanAndEditScreen", "Text recognition failed", e)
         }
 }
+

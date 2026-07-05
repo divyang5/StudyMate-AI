@@ -1,4 +1,4 @@
-package com.divyang.studymateai.ui.screen.chapter
+package com.divyang.studymateai.ui.screen.scan
 
 import android.content.Context
 import android.graphics.BitmapFactory

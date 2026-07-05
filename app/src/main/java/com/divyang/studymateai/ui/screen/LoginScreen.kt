@@ -65,6 +65,15 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
 
 
+    LaunchedEffect(Unit) {
+        val sharedPref = SharedPref(context)
+        val previousEmail = sharedPref.getEmail()
+        val firebaseUser = com.google.firebase.ktx.Firebase.auth.currentUser
+        if (sharedPref.isLoggedIn() && !previousEmail.isNullOrBlank() && firebaseUser == null) {
+            viewModel.prefillFromPreviousSession(previousEmail)
+        }
+    }
+
     // Save session + navigate on success
     LaunchedEffect(uiState.loginSuccess) {
         if (uiState.loginSuccess) {
@@ -76,12 +85,10 @@ fun LoginScreen(
             val displayName = firebaseUser?.displayName.orEmpty()
             val parts = displayName.trim().split(" ")
             val firstName = parts.getOrNull(0).orEmpty()
-            val lastName  = parts.drop(1).joinToString(" ")  // handles middle names too
+            val lastName  = parts.drop(1).joinToString(" ")
             val email  = firebaseUser?.email.orEmpty()
 
             sharedPref.saveUserSession(firebaseUser?.uid ?: "" , firstName ,lastName , email)
-
-
 
             onLoginSuccess()
         }
@@ -92,6 +99,14 @@ fun LoginScreen(
         uiState.generalError?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearGeneralError()
+        }
+    }
+
+
+    LaunchedEffect(uiState.infoMessage) {
+        uiState.infoMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearInfoMessage()
         }
     }
 
@@ -209,6 +224,20 @@ fun LoginScreen(
                     )
                 } else {
                     Text("Login", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+
+            // 🚨 NEW: Show Resend Verification Button if blocked 🚨
+            if (uiState.isEmailUnverified) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = { viewModel.resendVerificationEmail() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "Resend Verification Email",
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
 
