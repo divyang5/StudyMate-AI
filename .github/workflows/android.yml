@@ -13,6 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Remove local Java home override
+        run: |
+          sed -i '/org.gradle.java.home/d' gradle.properties
+        
+
       # Set up Gemini API key
       - name: Set up Gemini Key
         run: |
