@@ -13,15 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Remove local Java home override
-        run: |
-          sed -i '/org.gradle.java.home/d' gradle.properties
-        
-
       # Set up Gemini API key
       - name: Set up Gemini Key
         run: |
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> local.properties
+
+      # Set up AdMob Keys
+      - name: Set up AdMob Keys
+        run: |
+          echo "ADMOB_BANNER_ID=${{ secrets.ADMOB_BANNER_ID }}" >> local.properties
+          echo "ADMOB_INTERSTITIAL_ID=${{ secrets.ADMOB_INTERSTITIAL_ID }}" >> local.properties
 
       # Set up Java
       - name: Set up JDK 17
@@ -30,7 +31,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
-
 
       - name: Generate Version Code
         id: version
@@ -45,18 +45,52 @@ jobs:
           sed -i "s/versionName = .*/versionName = \"${{ steps.version.outputs.versionName }}\"/" app/build.gradle.kts
           cat app/build.gradle.kts | grep version
 
-      # Build with new version
+      # Build debug APK
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
-      # Verify APK exists
-      - name: Verify APK
+      # Verify debug APK exists
+      - name: Verify Debug APK
         run: |
           ls -la app/build/outputs/apk/debug/
           if [ ! -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
-            echo "::error::APK not found!"
+            echo "::error::Debug APK not found!"
             exit 1
           fi
+
+      # Decode keystore for release signing
+      - name: Decode Keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
+
+      # Build release AAB (signed)
+      - name: Build release AAB
+        env:
+          KEYSTORE_PATH: release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew bundleRelease
+
+      # Verify release AAB exists
+      - name: Verify Release AAB
+        run: |
+          ls -la app/build/outputs/bundle/release/
+          if [ ! -f "app/build/outputs/bundle/release/app-release.aab" ]; then
+            echo "::error::Release AAB not found!"
+            exit 1
+          fi
+
+      # Clean up decoded keystore (don't leave it on the runner filesystem)
+      - name: Remove decoded keystore
+        if: always()
+        run: rm -f app/release.jks
+
+      # Upload release AAB as a workflow artifact (download from Actions tab)
+      - name: Upload Release AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab
+          path: app/build/outputs/bundle/release/app-release.aab
 
       # Set up Node.js for Firebase
       - name: Set up Node.js
@@ -64,7 +98,7 @@ jobs:
         with:
           node-version: '20'
 
-      # Upload to Firebase with release notes
+      # Upload debug APK to Firebase App Distribution for testers
       - name: Upload to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
@@ -72,7 +106,6 @@ jobs:
           serviceCredentialsFileContent: ${{ secrets.CREDENTIAL_FILE_CONTENT }}
           groups: testers
           file: app/build/outputs/apk/debug/app-debug.apk
-          skipDependencies: true
           releaseNotes: |
             Auto-generated build
             Version: ${{ steps.version.outputs.versionName }}

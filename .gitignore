@@ -12,4 +12,11 @@
 /captures
 .externalNativeBuild
 .cxx
+*.apk
+*.aab
+/app/build/
+/build/
 local.properties
+*.jks
+*.keystore
+keystore_base64.txt

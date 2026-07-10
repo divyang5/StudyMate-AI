@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.divyang.studymateai.BuildConfig
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
@@ -27,27 +28,33 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 
+private const val TAG = "AdManager"
+
 class AdManager(private val context: Context) {
     // Interstitial Ad Properties
     private var interstitialAd: InterstitialAd? = null
 
     // Banner Ad Properties
     private var bannerAdView: AdView? = null
-    private var interstitialADUnit: String = "ca-app-pub-3940256099942544/1033173712"
-    private var bannerADUnit: String = "ca-app-pub-3940256099942544/6300978111"
 
+    private var interstitialADUnit: String = BuildConfig.INTERSTITIAL_AD_UNIT
+    private var bannerADUnit: String = BuildConfig.BANNER_AD_UNIT
+
+    init {
+        Log.d(TAG, "Initialized with bannerADUnit=$bannerADUnit, interstitialADUnit=$interstitialADUnit")
+    }
 
     fun loadInterstitialAd() {
         val adRequest = AdRequest.Builder().build()
         InterstitialAd.load(context, interstitialADUnit, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(ad: InterstitialAd) {
                 interstitialAd = ad
-                Log.d("AdManager", "Ad loaded successfull y")
+                Log.d(TAG, "Interstitial loaded successfully with unit: $interstitialADUnit")
             }
 
             override fun onAdFailedToLoad(error: LoadAdError) {
                 interstitialAd = null
-                Log.e("AdManager", "Failed to load ad: ${error.message}")
+                Log.e(TAG, "Interstitial failed to load. Code: ${error.code}, Message: ${error.message}, Domain: ${error.domain}")
             }
         })
     }
@@ -67,6 +74,7 @@ class AdManager(private val context: Context) {
                 }
 
                 override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                    Log.e(TAG, "Interstitial failed to show. Code: ${adError.code}, Message: ${adError.message}")
                     interstitialAd = null
                     loadInterstitialAd()
                     onAdFailed()
@@ -74,10 +82,11 @@ class AdManager(private val context: Context) {
             }
             ad.show(context as Activity)
         } else {
-            Log.d("AdManager", "Ad not loaded")
+            Log.d(TAG, "Interstitial not loaded, skipping show")
             onAdFailed()
         }
     }
+
     // Banner Ad Methods
     @Composable
     fun BannerAd(
@@ -88,12 +97,32 @@ class AdManager(private val context: Context) {
         var adView by remember { mutableStateOf<AdView?>(null) }
 
         DisposableEffect(Unit) {
+            Log.d(TAG, "Creating banner AdView with unit: $bannerADUnit")
+
             val newAdView = AdView(context).apply {
                 setAdSize(AdSize.BANNER)
                 this.adUnitId = bannerADUnit
                 adListener = object : AdListener() {
+                    override fun onAdLoaded() {
+                        Log.d(TAG, "Banner loaded successfully with unit: $bannerADUnit")
+                        loadError = false
+                    }
+
                     override fun onAdFailedToLoad(adError: LoadAdError) {
+                        Log.e(TAG, "Banner failed to load. Code: ${adError.code}, Message: ${adError.message}, Domain: ${adError.domain}")
                         loadError = true
+                    }
+
+                    override fun onAdOpened() {
+                        Log.d(TAG, "Banner ad opened")
+                    }
+
+                    override fun onAdClicked() {
+                        Log.d(TAG, "Banner ad clicked")
+                    }
+
+                    override fun onAdImpression() {
+                        Log.d(TAG, "Banner ad impression recorded")
                     }
                 }
                 loadAd(AdRequest.Builder().build())
@@ -102,6 +131,7 @@ class AdManager(private val context: Context) {
             bannerAdView = newAdView
 
             onDispose {
+                Log.d(TAG, "Disposing banner AdView")
                 newAdView.destroy()
                 bannerAdView = null
             }

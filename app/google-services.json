@@ -26,9 +26,9 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:175485432781:android:7f39c009cb27fef3c48a84",
+        "mobilesdk_app_id": "1:175485432781:android:9545f312d6976de5c48a84",
         "android_client_info": {
-          "package_name": "com.example.studymateai"
+          "package_name": "com.divyang.studymateai.debug"
         }
       },
       "oauth_client": [],

@@ -11,6 +11,10 @@ plugins {
     id("com.google.firebase.crashlytics")
 }
 
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
+}
 android {
     namespace = "com.divyang.studymateai"
     compileSdk = 35
@@ -38,13 +42,31 @@ android {
         )
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("KEYSTORE_PATH") ?: localProps.getProperty("KEYSTORE_PATH")
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: localProps.getProperty("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS") ?: localProps.getProperty("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD") ?: localProps.getProperty("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"   // installs alongside release, separate app
+            isDebuggable = true
+            buildConfigField("String", "BANNER_AD_UNIT", "\"ca-app-pub-3940256099942544/6300978111\"")
+            buildConfigField("String", "INTERSTITIAL_AD_UNIT", "\"ca-app-pub-3940256099942544/1033173712\"")
+        }
         release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isMinifyEnabled = false   // you already have this
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("String", "BANNER_AD_UNIT", "\"${localProps.getProperty("ADMOB_BANNER_ID", "")}\"")
+            buildConfigField("String", "INTERSTITIAL_AD_UNIT", "\"${localProps.getProperty("ADMOB_INTERSTITIAL_ID", "")}\"")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
