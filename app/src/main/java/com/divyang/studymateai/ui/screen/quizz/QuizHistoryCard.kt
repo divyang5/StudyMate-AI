@@ -42,35 +42,35 @@ fun QuizHistoryCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val dateFormat = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
-    val formattedDate = dateFormat.format(history.date)
+    val formattedDate = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
+        .format(history.date)
     val passed = history.score >= 50
+    val accent = if (passed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
 
     val accentGradient = if (passed) {
-        Brush.horizontalGradient(listOf(Color(0xFF534AB7), Color(0xFF1D9E75)))
+        Brush.horizontalGradient(
+            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+        )
     } else {
-        Brush.horizontalGradient(listOf(Color(0xFFA32D2D), Color(0xFFD85A30)))
+        // Warm red→orange accent only for the decorative strip.
+        Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.error, Color(0xFFD85A30)))
     }
-
-    val chipBg        = if (passed) Color(0xFFE1F5EE) else Color(0xFFFCEBEB)
-    val chipText      = if (passed) Color(0xFF0F6E56)  else Color(0xFFA32D2D)
-    val scoreColor    = if (passed) Color(0xFF0F6E56)  else Color(0xFFA32D2D)
 
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
-            contentColor   = MaterialTheme.colorScheme.onSurface
+            contentColor = MaterialTheme.colorScheme.onSurface
         ),
-        border   = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
         modifier = modifier.fillMaxWidth()
     ) {
         // ── Accent gradient strip ──────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(3.dp)
+                .height(4.dp)
                 .background(accentGradient)
         )
 
@@ -82,23 +82,23 @@ fun QuizHistoryCard(
             // ── Pass/Fail chip ─────────────────────────────────
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = chipBg
+                color = accent.copy(alpha = 0.15f)
             ) {
                 Row(
-                    verticalAlignment     = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier              = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Icon(
-                        painter           = painterResource(if (passed) R.drawable.passed else R.drawable.close),
+                        painter = painterResource(if (passed) R.drawable.passed else R.drawable.close),
                         contentDescription = null,
-                        tint              = chipText,
-                        modifier          = Modifier.size(13.dp)
+                        tint = accent,
+                        modifier = Modifier.size(13.dp)
                     )
                     Text(
-                        text  = if (passed) "Passed" else "Failed",
+                        text = if (passed) "Passed" else "Failed",
                         style = MaterialTheme.typography.labelSmall,
-                        color = chipText
+                        color = accent
                     )
                 }
             }
@@ -107,30 +107,30 @@ fun QuizHistoryCard(
 
             // ── Title + score badge ────────────────────────────
             Row(
-                verticalAlignment     = Alignment.Top,
+                verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.SpaceBetween,
-                modifier              = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text       = history.chapterTitle,
-                    style      = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines   = 2,
-                    overflow   = TextOverflow.Ellipsis,
-                    modifier   = Modifier.weight(1f)
+                    text = history.chapterTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(8.dp))
                 Surface(
                     shape = CircleShape,
-                    color = chipBg,
-                    modifier = Modifier.size(40.dp)
+                    color = accent.copy(alpha = 0.15f),
+                    modifier = Modifier.size(42.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            text  = "${history.score}%",
+                            text = "${history.score}%",
                             style = MaterialTheme.typography.labelSmall,
-                            color = scoreColor,
-                            fontWeight = FontWeight.SemiBold
+                            color = accent,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -140,38 +140,37 @@ fun QuizHistoryCard(
 
             // ── Score value ────────────────────────────────────
             Text(
-                text  = "Score",
+                text = "Score",
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.5.sp),
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
             Text(
-                text  = "${history.score} / 100",
+                text = "${history.score} / 100",
                 style = MaterialTheme.typography.titleMedium,
-                color = scoreColor,
-                fontWeight = FontWeight.Medium,
+                color = accent,
+                fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 2.dp)
             )
 
-            // ── Divider ───────────────────────────────────────
             HorizontalDivider(
-                modifier  = Modifier.padding(vertical = 10.dp),
+                modifier = Modifier.padding(vertical = 10.dp),
                 thickness = 0.5.dp,
-                color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
             )
 
             // ── Footer: date ──────────────────────────────────
             Row(
-                verticalAlignment     = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
-                    painter           = painterResource(R.drawable.ic_clock),
+                    painter = painterResource(R.drawable.ic_clock),
                     contentDescription = null,
-                    tint              = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                    modifier          = Modifier.size(13.dp)
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.size(13.dp)
                 )
                 Text(
-                    text  = formattedDate,
+                    text = formattedDate,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                 )

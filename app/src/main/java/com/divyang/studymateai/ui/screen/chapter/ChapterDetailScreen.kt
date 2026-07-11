@@ -51,12 +51,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.divyang.studymateai.R
 import com.divyang.studymateai.data.viewmodel.ChapterDetailUiState
 import com.divyang.studymateai.data.viewmodel.ChapterDetailViewModel
 import com.divyang.studymateai.navigation.Routes
+import com.divyang.studymateai.ui.components.AppColors
+import com.divyang.studymateai.ui.components.AppTopBar
 import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,86 +66,45 @@ import java.net.URLEncoder
 fun ChapterDetailScreen(
     navController: NavController,
     chapterId: String,
-    viewModel: ChapterDetailViewModel = viewModel()
+    viewModel: ChapterDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = (uiState as? ChapterDetailUiState.Success)?.chapter?.title
-                                ?: "Chapter Details",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    ),
-                    navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xFFEEEDFE)
-                            ) {
+            AppTopBar(
+                title = (uiState as? ChapterDetailUiState.Success)?.chapter?.title ?: "Chapter Details",
+                onBack = { navController.popBackStack() },
+                actions = {
+                    if (uiState is ChapterDetailUiState.Success) {
+                        IconButton(onClick = {
+                            val chapter = (uiState as ChapterDetailUiState.Success).chapter
+                            val encodedTitle = URLEncoder.encode(chapter.title, "UTF-8")
+                            val encodedDescription = URLEncoder.encode(chapter.description, "UTF-8")
+                            val encodedContent = URLEncoder.encode(chapter.content, "UTF-8")
+                            navController.navigate(
+                                Routes.TextEdit.createRoute(
+                                    title = encodedTitle,
+                                    description = encodedDescription,
+                                    content = encodedContent,
+                                    chapterId = chapter.id
+                                )
+                            )
+                        }) {
+                            Surface(shape = CircleShape, color = AppColors.PurpleTint) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = Color(0xFF534AB7),
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit",
+                                    tint = AppColors.Purple,
                                     modifier = Modifier
                                         .size(32.dp)
                                         .padding(6.dp)
                                 )
                             }
                         }
-                    },
-                    actions = {
-                        if (uiState is ChapterDetailUiState.Success) {
-                            IconButton(onClick = {
-                                val chapter = (uiState as ChapterDetailUiState.Success).chapter
-                                val encodedTitle       = URLEncoder.encode(chapter.title, "UTF-8")
-                                val encodedDescription = URLEncoder.encode(chapter.description, "UTF-8")
-                                val encodedContent     = URLEncoder.encode(chapter.content, "UTF-8")
-                                navController.navigate(
-                                    Routes.TextEdit.createRoute(
-                                        title = encodedTitle,
-                                        description = encodedDescription,
-                                        content = encodedContent,
-                                        chapterId = chapter.id
-                                    )
-                                )
-                            }) {
-                                Surface(shape = CircleShape, color = Color(0xFFEEEDFE)) {
-                                    Icon(
-                                        Icons.Default.Edit,
-                                        contentDescription = "Edit",
-                                        tint = Color(0xFF534AB7),
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .padding(6.dp)
-                                    )
-                                }
-                            }
-                        }
                     }
-                )
-                // ── Gradient strip ─────────────────────────────
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(Color(0xFF534AB7), Color(0xFF1D9E75))
-                            )
-                        )
-                )
-            }
+                }
+            )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
@@ -156,7 +117,7 @@ fun ChapterDetailScreen(
                 is ChapterDetailUiState.Loading -> {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
-                        color = Color(0xFF534AB7)
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -198,13 +159,13 @@ fun ChapterDetailScreen(
                             if (state.chapter.description.isNotBlank()) {
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = Color(0xFFEEEDFE),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text(
                                         text = state.chapter.description,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = Color(0xFF3C3489),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                                     )
                                 }
@@ -235,11 +196,11 @@ fun ChapterDetailScreen(
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             letterSpacing = 0.6.sp
                                         ),
-                                        color = Color(0xFF534AB7)
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                     HorizontalDivider(
                                         thickness = 0.5.dp,
-                                        color = Color(0xFF534AB7).copy(alpha = 0.15f)
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                                     )
                                     Text(
                                         text = state.chapter.content,
@@ -260,8 +221,8 @@ fun ChapterDetailScreen(
                                 ActionButton(
                                     iconResId = R.drawable.quizz,
                                     text = "Make Quiz",
-                                    containerColor = Color(0xFF534AB7),
-                                    contentColor = Color.White,
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
                                     onClick = {
                                         navController.navigate(
                                             Routes.QuizGen.createRoute(chapterId = chapterId)
@@ -272,8 +233,8 @@ fun ChapterDetailScreen(
                                 ActionButton(
                                     iconResId = R.drawable.library,
                                     text = "Generate Summary",
-                                    containerColor = Color(0xFFEEEDFE),
-                                    contentColor = Color(0xFF3C3489),
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                     onClick = {
                                         navController.navigate(Routes.Summary.createRoute(chapterId))
                                     }
@@ -281,8 +242,8 @@ fun ChapterDetailScreen(
                                 ActionButton(
                                     iconResId = R.drawable.flashcard,
                                     text = "Create Flashcards",
-                                    containerColor = Color(0xFFE1F5EE),
-                                    contentColor = Color(0xFF0F6E56),
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                                     onClick = {
                                         navController.navigate(Routes.Flashcards.createRoute(chapterId))
                                     }

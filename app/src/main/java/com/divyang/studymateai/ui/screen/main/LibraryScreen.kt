@@ -1,6 +1,5 @@
 package com.divyang.studymateai.ui.screen.main
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,8 +24,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,8 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.divyang.studymateai.data.model.chapters.Chapter
 import com.divyang.studymateai.data.viewmodel.LibraryViewModel
@@ -45,13 +42,14 @@ import com.divyang.studymateai.navigation.Routes
 import com.divyang.studymateai.ui.components.BottomNavigationBar
 import com.divyang.studymateai.ui.components.ChapterCard
 import com.divyang.studymateai.ui.components.DeleteConfirmDialog
+import com.divyang.studymateai.ui.components.GradientHero
 import com.divyang.studymateai.ui.components.SwipeToDeleteContainer
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun LibraryScreen(
     navController: NavController,
-    viewModel: LibraryViewModel = viewModel()
+    viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val filteredChapters = uiState.filteredChapters
@@ -59,46 +57,53 @@ fun LibraryScreen(
 
     val pullRefreshState = rememberPullRefreshState(
         refreshing = uiState.isRefreshing,
-        onRefresh  = viewModel::refresh
+        onRefresh = viewModel::refresh
     )
 
+    val count = uiState.chapters.size
+    val subtitle = if (count == 1) "1 saved chapter" else "$count saved chapters"
+
     Scaffold(
-        topBar = {
-            LibraryTopBar(
-                searchQuery       = uiState.searchQuery,
-                onSearchQueryChange = viewModel::onSearchQueryChange
-            )
-        },
-        bottomBar = { BottomNavigationBar(navController) }
+        bottomBar = { BottomNavigationBar(navController) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .pullRefresh(pullRefreshState)   // ← attach here
+                .pullRefresh(pullRefreshState)
         ) {
-            when {
-                uiState.isLoading -> LoadingState()
-                filteredChapters.isEmpty() -> EmptyState(searchQuery = uiState.searchQuery)
-                else -> ChapterList(
-                    chapters       = filteredChapters,
-                    onChapterClick = { navController.navigate(Routes.ChapterDetail.createRoute(it.id)) },
-                    onDeleteRequest = { chapterToDelete = it }
+            Column {
+                GradientHero(title = "Your Library", subtitle = subtitle)
+
+                SearchField(
+                    searchQuery = uiState.searchQuery,
+                    onSearchQueryChange = viewModel::onSearchQueryChange,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                 )
+
+                when {
+                    uiState.isLoading -> LoadingState()
+                    filteredChapters.isEmpty() -> EmptyState(searchQuery = uiState.searchQuery)
+                    else -> ChapterList(
+                        chapters = filteredChapters,
+                        onChapterClick = { navController.navigate(Routes.ChapterDetail.createRoute(it.id)) },
+                        onDeleteRequest = { chapterToDelete = it }
+                    )
+                }
             }
 
-            // Indicator always on top
             PullRefreshIndicator(
                 refreshing = uiState.isRefreshing,
-                state      = pullRefreshState,
-                modifier   = Modifier.align(Alignment.TopCenter)
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
             )
         }
     }
 
     chapterToDelete?.let { chapter ->
         DeleteConfirmDialog(
-            title   = "Delete chapter?",
+            title = "Delete chapter?",
             message = "\"${chapter.title}\" will be permanently removed.",
             onConfirm = {
                 viewModel.deleteChapter(chapter.id)
@@ -112,51 +117,29 @@ fun LibraryScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryTopBar(
+private fun SearchField(
     searchQuery: String,
-    onSearchQueryChange: (String) -> Unit
+    onSearchQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        TopAppBar(
-            title = {
-                Text(
-                    text = "Your Library",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.background
-            )
-        )
-
-        // Inline search field — always visible, no screen takeover
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 8.dp),
-            placeholder = { Text("Search chapters...") },
-            leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null)
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { onSearchQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear search")
-                    }
+    OutlinedTextField(
+        value = searchQuery,
+        onValueChange = onSearchQueryChange,
+        modifier = modifier.fillMaxWidth(),
+        placeholder = { Text("Search chapters...") },
+        leadingIcon = {
+            Icon(Icons.Default.Search, contentDescription = null)
+        },
+        trailingIcon = {
+            if (searchQuery.isNotEmpty()) {
+                IconButton(onClick = { onSearchQueryChange("") }) {
+                    Icon(Icons.Default.Close, contentDescription = "Clear search")
                 }
-            },
-            singleLine = true,
-            shape = MaterialTheme.shapes.large
-        )
-    }
+            }
+        },
+        singleLine = true,
+        shape = MaterialTheme.shapes.large
+    )
 }
 
 @Composable
@@ -166,8 +149,8 @@ private fun ChapterList(
     onDeleteRequest: (Chapter) -> Unit
 ) {
     LazyColumn(
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         items(chapters, key = { it.id }) { chapter ->
             SwipeToDeleteContainer(
@@ -211,12 +194,10 @@ private fun EmptyState(searchQuery: String) {
                     else
                         "No results for \"$searchQuery\"",
                     modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
     }
 }
-
-
-

@@ -4,9 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.divyang.studymateai.data.model.profile.UserProfile
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.UserProfileChangeRequest
-import com.google.firebase.firestore.FirebaseFirestore
+import com.divyang.studymateai.data.repository.AuthRepository
+import com.divyang.studymateai.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,21 +13,23 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
+
+data class EditProfileUiState(
+    val profile: UserProfile = UserProfile(),
+    val isUpdating: Boolean = false
+)
 
 @HiltViewModel
 class EditProfileViewModel @Inject constructor(
-    private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val authRepository: AuthRepository,
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
-    private val _userState = MutableStateFlow(UserProfile())
-    val userState = _userState.asStateFlow()
+    private val _uiState = MutableStateFlow(EditProfileUiState())
+    val uiState = _uiState.asStateFlow()
 
-    private val _isUpdating = MutableStateFlow(false)
-    val isUpdating = _isUpdating.asStateFlow()
-
+    // Toast is a one-shot event, kept as a Channel rather than folded into UiState.
     private val _toastMessage = Channel<String>(Channel.BUFFERED)
     val toastMessage = _toastMessage.receiveAsFlow()
 
@@ -38,25 +39,18 @@ class EditProfileViewModel @Inject constructor(
 
     private fun loadUserProfile() {
         viewModelScope.launch {
-            val userId = auth.currentUser?.uid ?: run {
+            val userId = authRepository.currentUserId ?: run {
                 _toastMessage.trySend("No authenticated user found")
                 return@launch
             }
             try {
-                val doc = firestore.collection("users").document(userId).get().await()
-                _userState.update {
-                    it.copy(
-                        uid = doc.id,
-                        firstName = doc.getString("firstName") ?: "",
-                        lastName = doc.getString("lastName") ?: "",
-                        email = doc.getString("email") ?: auth.currentUser?.email ?: "",
-                        createdAt = doc.getTimestamp("createdAt")
-                    )
-                }
-                Log.d(TAG, "User loaded: ${_userState.value.firstName} ${_userState.value.lastName}")
+                val profile = userRepository.getUserProfile(userId)
+                val withEmail = profile.copy(
+                    email = profile.email.ifBlank { authRepository.currentEmail.orEmpty() }
+                )
+                _uiState.update { it.copy(profile = withEmail) }
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching user", e)
-                _userState.update { it.copy(error = "Failed to load user data") }
                 _toastMessage.trySend("Failed to load profile")
             }
         }
@@ -67,35 +61,25 @@ class EditProfileViewModel @Inject constructor(
             _toastMessage.trySend("Name fields cannot be empty")
             return
         }
-
-        val userId = auth.currentUser?.uid ?: run {
+        val userId = authRepository.currentUserId ?: run {
             _toastMessage.trySend("No authenticated user found")
             return
         }
 
         viewModelScope.launch {
-            _isUpdating.value = true
+            _uiState.update { it.copy(isUpdating = true) }
             try {
-                // Update Firestore
-                firestore.collection("users").document(userId)
-                    .update(mapOf("firstName" to firstName, "lastName" to lastName))
-                    .await()
-
-                // Keep Firebase Auth display name in sync
-                val request = UserProfileChangeRequest.Builder()
-                    .setDisplayName("$firstName $lastName")
-                    .build()
-                auth.currentUser?.updateProfile(request)?.await()
-
-                // Update local state
-                _userState.update { it.copy(firstName = firstName, lastName = lastName) }
+                userRepository.updateName(userId, firstName, lastName)
+                authRepository.updateDisplayName("$firstName $lastName")
+                _uiState.update {
+                    it.copy(profile = it.profile.copy(firstName = firstName, lastName = lastName))
+                }
                 _toastMessage.send("Profile updated successfully")
-                Log.d(TAG, "Profile updated: $firstName $lastName")
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating profile", e)
                 _toastMessage.send("Failed to update profile: ${e.message}")
             } finally {
-                _isUpdating.value = false
+                _uiState.update { it.copy(isUpdating = false) }
             }
         }
     }

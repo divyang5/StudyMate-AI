@@ -140,10 +140,12 @@ fun StudyMateNavHost(
             val existingTextEncoded =
                 backStackEntry.arguments?.getString(Routes.Scan.ARG_EXISTING_TEXT)
             val existingText = existingTextEncoded?.let { URLDecoder.decode(it, "UTF-8") }
+            val fromCamera = backStackEntry.arguments?.getBoolean(Routes.Scan.ARG_FROM_CAMERA) ?: false
 
             ScanScreen(
                 navController = navController,
-                initialText = existingText
+                initialText = existingText,
+                fromCamera = fromCamera
             )
         }
 

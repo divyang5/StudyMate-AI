@@ -55,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import com.divyang.studymateai.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -96,12 +97,17 @@ enum class ScreenState { SCAN_SELECTION, SCANNING, EDITING }
 fun ScanScreen(
     navController: NavController,
     initialText: String? = null,
+    fromCamera: Boolean = false,
     context: Context = LocalContext.current
 ) {
     val scope = rememberCoroutineScope()
     val currentScreenState = remember {
         mutableStateOf(
-            if (initialText.isNullOrEmpty()) ScreenState.SCAN_SELECTION else ScreenState.EDITING
+            when {
+                !initialText.isNullOrEmpty() -> ScreenState.EDITING
+                fromCamera -> ScreenState.SCANNING   // "Take Photo" opens the camera directly
+                else -> ScreenState.SCAN_SELECTION
+            }
         )
     }
     val showDiscardDialog  = remember { mutableStateOf(false) }
@@ -189,56 +195,24 @@ fun ScanScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = when (currentScreenState.value) {
-                                ScreenState.SCAN_SELECTION -> "Add Chapter"
-                                ScreenState.SCANNING       -> "Scan Document"
-                                ScreenState.EDITING        -> "Edit Document"
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            when (currentScreenState.value) {
-                                ScreenState.SCAN_SELECTION -> navController.popBackStack()
-                                ScreenState.SCANNING -> currentScreenState.value =
-                                    if (extractedText.value.isNotEmpty()) ScreenState.EDITING
-                                    else ScreenState.SCAN_SELECTION
-                                ScreenState.EDITING -> if (extractedText.value.isNotEmpty())
-                                    showDiscardDialog.value = true
-                                else navController.popBackStack()
-                            }
-                        }) {
-                            Surface(shape = CircleShape, color = Color(0xFFEEEDFE)) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = Color(0xFF534AB7),
-                                    modifier = Modifier.size(32.dp).padding(6.dp)
-                                )
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    )
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(Color(0xFF534AB7), Color(0xFF1D9E75))
-                            )
-                        )
-                )
-            }
+            AppTopBar(
+                title = when (currentScreenState.value) {
+                    ScreenState.SCAN_SELECTION -> "Add Chapter"
+                    ScreenState.SCANNING -> "Scan Document"
+                    ScreenState.EDITING -> "Edit Document"
+                },
+                onBack = {
+                    when (currentScreenState.value) {
+                        ScreenState.SCAN_SELECTION -> navController.popBackStack()
+                        ScreenState.SCANNING -> currentScreenState.value =
+                            if (extractedText.value.isNotEmpty()) ScreenState.EDITING
+                            else ScreenState.SCAN_SELECTION
+                        ScreenState.EDITING -> if (extractedText.value.isNotEmpty())
+                            showDiscardDialog.value = true
+                        else navController.popBackStack()
+                    }
+                }
+            )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->

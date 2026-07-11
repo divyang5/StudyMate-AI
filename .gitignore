@@ -20,3 +20,4 @@ local.properties
 *.jks
 *.keystore
 keystore_base64.txt
+.claude/settings.local.json

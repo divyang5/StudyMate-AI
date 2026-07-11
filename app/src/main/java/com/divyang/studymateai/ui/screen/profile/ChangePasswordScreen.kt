@@ -5,46 +5,29 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.divyang.studymateai.R
 import com.divyang.studymateai.data.viewmodel.ChangePasswordViewModel
+import com.divyang.studymateai.ui.components.AppTopBar
+import com.divyang.studymateai.ui.components.AuthTextField
+import com.divyang.studymateai.ui.components.PrimaryButton
 import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,9 +38,7 @@ fun ChangePasswordScreen(
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
-    var currentPasswordVisible by remember { mutableStateOf(false) }
-    var newPasswordVisible by remember { mutableStateOf(false) }
-    var confirmPasswordVisible by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collectLatest { message ->
@@ -65,29 +46,12 @@ fun ChangePasswordScreen(
         }
     }
 
-    val passwordsMatch = viewModel.newPassword.isEmpty() ||
-            viewModel.newPassword == viewModel.confirmPassword
+    val newTooShort = uiState.newPassword.isNotEmpty() && uiState.newPassword.length < 8
+    val passwordsMatch = uiState.newPassword.isEmpty() || uiState.newPassword == uiState.confirmPassword
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Change password",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        }
+        topBar = { AppTopBar(title = "Change password", onBack = { navController.popBackStack() }) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(
             modifier = Modifier
@@ -104,118 +68,45 @@ fun ChangePasswordScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Current password
-            OutlinedTextField(
-                value = viewModel.currentPassword,
+            AuthTextField(
+                value = uiState.currentPassword,
                 onValueChange = viewModel::updateCurrentPassword,
-                label = { Text("Current password") },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = if (currentPasswordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password, imeAction = ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                trailingIcon = {
-                    IconButton(onClick = { currentPasswordVisible = !currentPasswordVisible }) {
-                        Icon(
-                            painter = painterResource(
-                                id = if (currentPasswordVisible) R.drawable.visibility_on
-                                else R.drawable.visibility_off
-                            ),
-                            contentDescription = null
-                        )
-                    }
-                }
+                label = "Current password",
+                isPassword = true,
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
 
-            // New password
-            OutlinedTextField(
-                value = viewModel.newPassword,
+            AuthTextField(
+                value = uiState.newPassword,
                 onValueChange = viewModel::updateNewPassword,
-                label = { Text("New password") },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = if (newPasswordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password, imeAction = ImeAction.Next
-                ),
+                label = "New password",
+                isPassword = true,
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                trailingIcon = {
-                    IconButton(onClick = { newPasswordVisible = !newPasswordVisible }) {
-                        Icon(
-                            painter = painterResource(
-                                id = if (newPasswordVisible) R.drawable.visibility_on
-                                else R.drawable.visibility_off
-                            ),
-                            contentDescription = null
-                        )
-                    }
-                },
-                supportingText = {
-                    if (viewModel.newPassword.isNotEmpty() && viewModel.newPassword.length < 8) {
-                        Text("At least 8 characters")
-                    }
-                },
-                isError = viewModel.newPassword.isNotEmpty() && viewModel.newPassword.length < 8
+                isError = newTooShort,
+                errorText = if (newTooShort) "At least 8 characters" else null
             )
 
-            // Confirm password
-            OutlinedTextField(
-                value = viewModel.confirmPassword,
+            AuthTextField(
+                value = uiState.confirmPassword,
                 onValueChange = viewModel::updateConfirmPassword,
-                label = { Text("Confirm new password") },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password, imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { focusManager.clearFocus(); viewModel.changePassword() }
-                ),
-                trailingIcon = {
-                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                        Icon(
-                            painter = painterResource(
-                                id = if (confirmPasswordVisible) R.drawable.visibility_on
-                                else R.drawable.visibility_off
-                            ),
-                            contentDescription = null
-                        )
-                    }
-                },
+                label = "Confirm new password",
+                isPassword = true,
+                imeAction = ImeAction.Done,
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); viewModel.changePassword() }),
                 isError = !passwordsMatch,
-                supportingText = { if (!passwordsMatch) Text("Passwords don't match") }
+                errorText = if (!passwordsMatch) "Passwords don't match" else null
             )
 
             Spacer(Modifier.height(16.dp))
 
-            Button(
+            PrimaryButton(
+                text = "Update password",
                 onClick = { focusManager.clearFocus(); viewModel.changePassword() },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                enabled = !viewModel.isLoading &&
-                        viewModel.currentPassword.isNotEmpty() &&
-                        viewModel.newPassword.length >= 8 &&
-                        viewModel.newPassword == viewModel.confirmPassword
-            ) {
-                if (viewModel.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Update password", style = MaterialTheme.typography.labelLarge)
-                }
-            }
+                isLoading = uiState.isLoading,
+                enabled = uiState.currentPassword.isNotEmpty() &&
+                        uiState.newPassword.length >= 8 &&
+                        uiState.newPassword == uiState.confirmPassword
+            )
         }
     }
 }

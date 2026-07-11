@@ -5,15 +5,15 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.divyang.studymateai.data.model.quizz.QuizHistory
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
+import com.divyang.studymateai.data.repository.AuthRepository
+import com.divyang.studymateai.data.repository.QuizHistoryRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
 
 data class HistoryUiState(
     val isLoading: Boolean = true,
@@ -23,10 +23,11 @@ data class HistoryUiState(
     val pendingDelete: QuizHistory? = null,   // non-null = show confirm dialog
 )
 
-class HistoryViewModel : ViewModel() {
-
-    private val auth      = Firebase.auth
-    private val firestore = Firebase.firestore
+@HiltViewModel
+class HistoryViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val quizHistoryRepository: QuizHistoryRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
@@ -38,53 +39,28 @@ class HistoryViewModel : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            // re-fetch chapters from Firestore
-            loadHistory()
+            loadHistorySuspend()
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }
-    // ─── Load ─────────────────────────────────────────────────────────────────
 
     fun loadHistory() {
-        val userId = auth.currentUser?.uid ?: return
+        viewModelScope.launch { loadHistorySuspend() }
+    }
+
+    private suspend fun loadHistorySuspend() {
+        val userId = authRepository.currentUserId ?: run {
+            _uiState.update { it.copy(isLoading = false) }
+            return
+        }
         _uiState.update { it.copy(isLoading = true, error = null) }
-
-        viewModelScope.launch {
-            runCatching {
-                val snapshot = firestore.collection("quizHistory")
-                    .whereEqualTo("userId", userId)
-                    .get()
-                    .await()
-
-                // Collect unique chapter IDs and batch-fetch their titles
-                val chapterIds = snapshot.documents
-                    .mapNotNull { it.getString("chapterId") }
-                    .toSet()
-
-                val titlesMap = mutableMapOf<String, String>()
-                chapterIds.forEach { id ->
-                    val doc = firestore.collection("chapters").document(id).get().await()
-                    titlesMap[id] = doc.getString("title") ?: "Unknown Chapter"
-                }
-
-                snapshot.documents.mapNotNull { doc ->
-                    val date = doc.getDate("date") ?: return@mapNotNull null
-                    val chapterId = doc.getString("chapterId") ?: ""
-                    QuizHistory(
-                        id           = doc.id,
-                        chapterId    = chapterId,
-                        score        = doc.getLong("score")?.toInt() ?: 0,
-                        date         = date,
-                        chapterTitle = titlesMap[chapterId] ?: "Unknown Chapter",
-                    )
-                }.sortedByDescending { it.date }
-
-            }.onSuccess { list ->
-                _uiState.update { it.copy(isLoading = false, histories = list) }
-            }.onFailure { e ->
-                Log.e("HistoryViewModel", "Error loading quiz history", e)
-                _uiState.update { it.copy(isLoading = false, error = "Failed to load history.") }
-            }
+        runCatching {
+            quizHistoryRepository.getHistory(userId)
+        }.onSuccess { list ->
+            _uiState.update { it.copy(isLoading = false, histories = list) }
+        }.onFailure { e ->
+            Log.e("HistoryViewModel", "Error loading quiz history", e)
+            _uiState.update { it.copy(isLoading = false, error = "Failed to load history.") }
         }
     }
 
@@ -107,9 +83,8 @@ class HistoryViewModel : ViewModel() {
 
         viewModelScope.launch {
             runCatching {
-                firestore.collection("quizHistory").document(target.id).delete().await()
+                quizHistoryRepository.deleteHistory(target.id)
             }.onSuccess {
-                Log.d("HistoryViewModel", "Deleted history ${target.id}")
                 _uiState.update { state ->
                     state.copy(histories = state.histories.filter { it.id != target.id })
                 }

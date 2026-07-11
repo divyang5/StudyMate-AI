@@ -3,16 +3,14 @@ package com.divyang.studymateai.data.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
+import com.divyang.studymateai.data.repository.AuthRepository
+import com.divyang.studymateai.data.repository.UserRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
 
 data class SignUpUiState(
     val firstName: String = "",
@@ -31,21 +29,23 @@ data class SignUpUiState(
     val signUpSuccessEmail: String = ""
 )
 
-class SignUpViewModel : ViewModel() {
+@HiltViewModel
+class SignUpViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val userRepository: UserRepository
+) : ViewModel() {
 
-    private val auth: FirebaseAuth = Firebase.auth
-    private val firestore = Firebase.firestore
     private val _uiState = MutableStateFlow(SignUpUiState())
     val uiState: StateFlow<SignUpUiState> = _uiState
 
     fun onFirstNameChange(v: String) = _uiState.update { it.copy(firstName = v, firstNameError = null) }
-    fun onLastNameChange(v: String)  = _uiState.update { it.copy(lastName = v, lastNameError = null) }
-    fun onEmailChange(v: String)     = _uiState.update { it.copy(email = v, emailError = null, generalError = null) }
-    fun onPasswordChange(v: String)  = _uiState.update { it.copy(password = v, passwordError = null) }
+    fun onLastNameChange(v: String) = _uiState.update { it.copy(lastName = v, lastNameError = null) }
+    fun onEmailChange(v: String) = _uiState.update { it.copy(email = v, emailError = null, generalError = null) }
+    fun onPasswordChange(v: String) = _uiState.update { it.copy(password = v, passwordError = null) }
     fun onConfirmPasswordChange(v: String) = _uiState.update { it.copy(confirmPassword = v, confirmPasswordError = null) }
 
     fun dismissVerificationDialog() {
-        auth.signOut()
+        authRepository.signOut()
         _uiState.update { it.copy(showVerificationDialog = false) }
     }
 
@@ -54,10 +54,9 @@ class SignUpViewModel : ViewModel() {
     fun signUp() {
         val s = _uiState.value
 
-        // Validate all fields
-        val firstNameError  = if (s.firstName.isBlank()) "First name is required" else null
-        val lastNameError   = if (s.lastName.isBlank()) "Last name is required" else null
-        val emailError      = when {
+        val firstNameError = if (s.firstName.isBlank()) "First name is required" else null
+        val lastNameError = if (s.lastName.isBlank()) "Last name is required" else null
+        val emailError = when {
             s.email.isBlank() -> "Email is required"
             !android.util.Patterns.EMAIL_ADDRESS.matcher(s.email).matches() -> "Enter a valid email"
             else -> null
@@ -90,22 +89,14 @@ class SignUpViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, generalError = null) }
             try {
-                val result = auth.createUserWithEmailAndPassword(s.email.trim(), s.password).await()
-                val uid = result.user?.uid ?: throw Exception("UID missing")
-
-                // Firestore user doc
-                firestore.collection("users").document(uid).set(
-                    hashMapOf(
-                        "uid" to uid,
-                        "firstName" to s.firstName.trim(),
-                        "lastName" to s.lastName.trim(),
-                        "email" to s.email.trim(),
-                        "createdAt" to FieldValue.serverTimestamp()
-                    )
-                ).await()
-
-                // Verification email
-                result.user?.sendEmailVerification()?.await()
+                val uid = authRepository.signUp(s.email.trim(), s.password)
+                userRepository.createUserProfile(
+                    uid = uid,
+                    firstName = s.firstName.trim(),
+                    lastName = s.lastName.trim(),
+                    email = s.email.trim()
+                )
+                authRepository.sendEmailVerification()
 
                 _uiState.update {
                     it.copy(isLoading = false, showVerificationDialog = true, signUpSuccessEmail = s.email.trim())

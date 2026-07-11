@@ -6,14 +6,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.divyang.studymateai.data.model.chapters.Chapter
-import com.google.firebase.Firebase
-import com.google.firebase.firestore.firestore
+import com.divyang.studymateai.data.repository.ChapterRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import java.util.Date
+import javax.inject.Inject
 
 sealed class ChapterDetailUiState {
     object Loading : ChapterDetailUiState()
@@ -21,7 +20,9 @@ sealed class ChapterDetailUiState {
     object Error : ChapterDetailUiState()
 }
 
-class ChapterDetailViewModel(
+@HiltViewModel
+class ChapterDetailViewModel @Inject constructor(
+    private val chapterRepository: ChapterRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -38,19 +39,7 @@ class ChapterDetailViewModel(
         viewModelScope.launch {
             _uiState.value = ChapterDetailUiState.Loading
             try {
-                val document = Firebase.firestore
-                    .collection("chapters")
-                    .document(chapterId)
-                    .get()
-                    .await()
-
-                val chapter = Chapter(
-                    id = document.id,
-                    title = document.getString("title") ?: "",
-                    description = document.getString("description") ?: "",
-                    content = document.getString("content") ?: "",
-                    createdAt = document.getDate("createdAt") ?: Date()
-                )
+                val chapter = chapterRepository.getChapter(chapterId)
                 _uiState.value = ChapterDetailUiState.Success(chapter)
             } catch (e: Exception) {
                 Log.e("ChapterDetailVM", "Error loading chapter", e)

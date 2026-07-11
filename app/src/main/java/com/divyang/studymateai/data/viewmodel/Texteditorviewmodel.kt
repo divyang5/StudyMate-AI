@@ -2,16 +2,15 @@ package com.divyang.studymateai.data.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.Firebase
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.firestore
+import com.divyang.studymateai.data.repository.AuthRepository
+import com.divyang.studymateai.data.repository.ChapterRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
 
 data class TextEditorUiState(
     val title: String = "",
@@ -23,7 +22,11 @@ data class TextEditorUiState(
     val showValidationErrors: Boolean = false
 )
 
-class TextEditorViewModel : ViewModel() {
+@HiltViewModel
+class TextEditorViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val chapterRepository: ChapterRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TextEditorUiState())
     val uiState: StateFlow<TextEditorUiState> = _uiState.asStateFlow()
@@ -55,37 +58,14 @@ class TextEditorViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             try {
-                val userId = Firebase.auth.currentUser?.uid
+                val userId = authRepository.currentUserId
                     ?: throw Exception("User not logged in")
-                val db = Firebase.firestore
 
                 val chapterId = existingChapterId
                 if (chapterId != null) {
-                    // ── EDIT MODE: update existing document ──
-                    db.collection("chapters")
-                        .document(chapterId)
-                        .update(
-                            mapOf(
-                                "title" to state.title,
-                                "description" to state.description,
-                                "content" to state.content,
-                                "updatedAt" to FieldValue.serverTimestamp()
-                            )
-                        )
-                        .await()
+                    chapterRepository.updateChapter(chapterId, state.title, state.description, state.content)
                 } else {
-                    // ── CREATE MODE: add new document ──
-                    db.collection("chapters")
-                        .add(
-                            hashMapOf(
-                                "title" to state.title,
-                                "description" to state.description,
-                                "content" to state.content,
-                                "createdAt" to FieldValue.serverTimestamp(),
-                                "userId" to userId
-                            )
-                        )
-                        .await()
+                    chapterRepository.createChapter(userId, state.title, state.description, state.content)
                 }
 
                 _uiState.update { it.copy(isSaving = false, saveSuccess = true) }

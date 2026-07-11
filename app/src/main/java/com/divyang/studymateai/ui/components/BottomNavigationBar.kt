@@ -81,8 +81,8 @@ fun BottomNavigationBar(navController: NavController) {
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.25f),
-                            Color.White.copy(alpha = 0.10f)
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
                         )
                     )
                 )
@@ -90,8 +90,8 @@ fun BottomNavigationBar(navController: NavController) {
                     width = 1.dp,
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.6f),
-                            Color.White.copy(alpha = 0.1f)
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                         )
                     ),
                     shape = RoundedCornerShape(50.dp)
@@ -138,7 +138,7 @@ fun BottomNavigationBar(navController: NavController) {
                         targetValue = if (selected)
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                         else
-                            Color.Black.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         animationSpec = tween(durationMillis = 0),
                         label = "iconColor"
                     )

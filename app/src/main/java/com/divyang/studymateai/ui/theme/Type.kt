@@ -16,38 +16,36 @@ val fontProvider = GoogleFont.Provider(
     providerPackage   = "com.google.android.gms",
     certificates      = R.array.com_google_android_gms_fonts_certs
 )
-val puritanFontFamily = FontFamily(
-    Font(
-        googleFont    = GoogleFont("Puritan"),
-        fontProvider  = fontProvider,
-//        weight        = FontWeight.Bold
-    )
+// ── Classic serif for titles / headlines / display ──────────────
+val displaySerifFamily = FontFamily(
+    Font(googleFont = GoogleFont("Fraunces"), fontProvider = fontProvider, weight = FontWeight.Medium),
+    Font(googleFont = GoogleFont("Fraunces"), fontProvider = fontProvider, weight = FontWeight.SemiBold),
+    Font(googleFont = GoogleFont("Fraunces"), fontProvider = fontProvider, weight = FontWeight.Bold),
 )
-val puritan400FontFamily = FontFamily(
-    Font(
-        googleFont    = GoogleFont("Puritan"),
-        fontProvider  = fontProvider,
-        weight        = FontWeight.W400
-    )
+
+// ── Clean sans for body / labels ────────────────────────────────
+val bodySansFamily = FontFamily(
+    Font(googleFont = GoogleFont("Inter"), fontProvider = fontProvider, weight = FontWeight.Normal),
+    Font(googleFont = GoogleFont("Inter"), fontProvider = fontProvider, weight = FontWeight.Medium),
 )
 val Typography = Typography(
     // ── Body ──────────────────────────────────────────────────
     bodySmall = TextStyle(
-        fontFamily    = puritan400FontFamily,
+        fontFamily    = bodySansFamily,
         fontWeight    = FontWeight.Normal,
         fontSize      = 12.sp,
         lineHeight    = 16.sp,
         letterSpacing = 0.4.sp
     ),
     bodyMedium = TextStyle(
-        fontFamily    = puritan400FontFamily,
+        fontFamily    = bodySansFamily,
         fontWeight    = FontWeight.Normal,
         fontSize      = 14.sp,
         lineHeight    = 20.sp,
         letterSpacing = 0.25.sp
     ),
     bodyLarge = TextStyle(
-        fontFamily    = puritan400FontFamily,
+        fontFamily    = bodySansFamily,
         fontWeight    = FontWeight.Normal,
         fontSize      = 16.sp,
         lineHeight    = 24.sp,
@@ -56,81 +54,81 @@ val Typography = Typography(
 
     // ── Labels ────────────────────────────────────────────────
     labelSmall = TextStyle(
-        fontFamily    = puritanFontFamily,
+        fontFamily    = bodySansFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 11.sp,
         lineHeight    = 16.sp,
         letterSpacing = 0.5.sp
     ),
     labelMedium = TextStyle(
-        fontFamily    = puritanFontFamily,
+        fontFamily    = bodySansFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 12.sp,
         lineHeight    = 16.sp,
         letterSpacing = 0.5.sp
     ),
     labelLarge = TextStyle(
-        fontFamily    = puritanFontFamily,
+        fontFamily    = bodySansFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 14.sp,
         lineHeight    = 20.sp,
         letterSpacing = 0.1.sp
     ),
 
-    // ── Titles / Headlines / Display → puritanFontFamily ──────
+    // ── Titles / Headlines / Display → displaySerifFamily ──────
     displayLarge = TextStyle(
-        fontFamily    = puritanFontFamily,
+        fontFamily    = displaySerifFamily,
         fontWeight    = FontWeight.Bold,
         fontSize      = 57.sp,
         lineHeight    = 64.sp,
         letterSpacing = (-0.25).sp
     ),
     displayMedium = TextStyle(
-        fontFamily = puritanFontFamily,
+        fontFamily = displaySerifFamily,
         fontWeight = FontWeight.Bold,
         fontSize   = 45.sp,
         lineHeight = 52.sp
     ),
     displaySmall = TextStyle(
-        fontFamily = puritanFontFamily,
+        fontFamily = displaySerifFamily,
         fontWeight = FontWeight.Bold,
         fontSize   = 36.sp,
         lineHeight = 44.sp
     ),
     headlineLarge = TextStyle(
-        fontFamily = puritanFontFamily,
+        fontFamily = displaySerifFamily,
         fontWeight = FontWeight.Bold,
         fontSize   = 32.sp,
         lineHeight = 40.sp
     ),
     headlineMedium = TextStyle(
-        fontFamily = puritanFontFamily,
+        fontFamily = displaySerifFamily,
         fontWeight = FontWeight.Bold,
         fontSize   = 28.sp,
         lineHeight = 36.sp
     ),
     headlineSmall = TextStyle(
-        fontFamily = puritanFontFamily,
+        fontFamily = displaySerifFamily,
         fontWeight = FontWeight.Bold,
         fontSize   = 24.sp,
         lineHeight = 32.sp
     ),
     titleLarge = TextStyle(
-        fontFamily    = puritanFontFamily,
+        fontFamily    = displaySerifFamily,
         fontWeight    = FontWeight.Bold,
         fontSize      = 22.sp,
         lineHeight    = 28.sp,
         letterSpacing = 0.sp
     ),
     titleMedium = TextStyle(
-        fontFamily    = puritanFontFamily,
+        fontFamily    = displaySerifFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 16.sp,
         lineHeight    = 24.sp,
         letterSpacing = 0.15.sp
     ),
     titleSmall = TextStyle(
-        fontFamily    = puritanFontFamily,
+        fontFamily    = displaySerifFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 14.sp,
         lineHeight    = 20.sp,

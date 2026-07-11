@@ -2,14 +2,13 @@ package com.divyang.studymateai.data.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.ktx.Firebase
+import com.divyang.studymateai.data.repository.AuthRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
 
 data class LoginUiState(
     val email: String = "",
@@ -20,12 +19,14 @@ data class LoginUiState(
     val generalError: String? = null,
     val loginSuccess: Boolean = false,
     val infoMessage: String? = null,
-    val isEmailUnverified: Boolean = false // <-- NEW: Tracks if we should show the "Resend" button
+    val isEmailUnverified: Boolean = false
 )
 
-class LoginViewModel : ViewModel() {
+@HiltViewModel
+class LoginViewModel @Inject constructor(
+    private val authRepository: AuthRepository
+) : ViewModel() {
 
-    private val auth: FirebaseAuth = Firebase.auth
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState
 
@@ -76,21 +77,16 @@ class LoginViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, generalError = null, isEmailUnverified = false) }
             try {
-                // 1. Authenticate with Firebase
-                val result = auth.signInWithEmailAndPassword(state.email.trim(), state.password).await()
-                val user = result.user
-
-                // 2. Check Verification Status
-                if (user?.isEmailVerified == true) {
+                val user = authRepository.signIn(state.email.trim(), state.password)
+                if (user.isEmailVerified) {
                     _uiState.update { it.copy(isLoading = false, loginSuccess = true) }
                 } else {
-                    // Block login. We leave them "authenticated" in Firebase temporarily
-                    // so we can call sendEmailVerification(), but we DON'T trigger loginSuccess
+                    // Block login but leave them authenticated so we can resend verification.
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             generalError = "Please verify your email address to continue.",
-                            isEmailUnverified = true // Triggers the resend button in UI
+                            isEmailUnverified = true
                         )
                     }
                 }
@@ -107,19 +103,18 @@ class LoginViewModel : ViewModel() {
         }
     }
 
-    // NEW: Function to resend the verification email
     fun resendVerificationEmail() {
         viewModelScope.launch {
             try {
-                auth.currentUser?.sendEmailVerification()?.await()
+                authRepository.sendEmailVerification()
                 _uiState.update {
                     it.copy(
                         infoMessage = "Verification email sent! Please check your inbox.",
-                        isEmailUnverified = false // Hide button after sending to prevent spam
+                        isEmailUnverified = false
                     )
                 }
-                // Sign out so they have to log in fresh once they verify
-                auth.signOut()
+                // Sign out so they must log in fresh once verified.
+                authRepository.signOut()
             } catch (e: Exception) {
                 _uiState.update { it.copy(generalError = "Failed to send email. Try again later.") }
             }

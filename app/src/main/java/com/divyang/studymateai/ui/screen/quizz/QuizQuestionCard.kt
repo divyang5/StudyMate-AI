@@ -1,6 +1,7 @@
 package com.divyang.studymateai.ui.screen.quizz
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,8 +14,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import com.divyang.studymateai.data.model.quizz.QuizQuestion
 
@@ -30,18 +34,28 @@ fun QuizQuestionCard(
 ) {
 
 
+    // Glassy gradient: blend the incoming hue toward an on-brand tint and render it
+    // as a soft translucent gradient that reads well in both light and dark themes.
+    val cardGradient = remember(randomColor) {
+        val blended = lerp(randomColor.copy(alpha = 1f), Color(0xFFEEEDFE), 0.5f)
+        Brush.linearGradient(
+            listOf(blended.copy(alpha = 0.40f), blended.copy(alpha = 0.10f))
+        )
+    }
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = randomColor
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .background(cardGradient)
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(

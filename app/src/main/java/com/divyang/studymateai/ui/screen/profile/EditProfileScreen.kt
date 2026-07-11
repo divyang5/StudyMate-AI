@@ -38,6 +38,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.divyang.studymateai.data.viewmodel.EditProfileViewModel
+import com.divyang.studymateai.ui.components.AppTopBar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,8 +50,9 @@ fun EditProfileScreen(
     viewModel: EditProfileViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val userState by viewModel.userState.collectAsStateWithLifecycle()
-    val isUpdating by viewModel.isUpdating.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val userState = uiState.profile
+    val isUpdating = uiState.isUpdating
 
     // Local editable fields — initialised once when profile loads
     var firstName by rememberSaveable(userState.uid) { mutableStateOf(userState.firstName) }
@@ -63,28 +65,7 @@ fun EditProfileScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = ("Edit Profile"),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                }
-            )
-        },
+        topBar = { AppTopBar(title = "Edit Profile", onBack = { navController.popBackStack() }) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { viewModel.updateProfile(firstName, lastName) },

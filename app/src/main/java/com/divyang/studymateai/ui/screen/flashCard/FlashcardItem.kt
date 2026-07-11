@@ -1,6 +1,7 @@
 package com.divyang.studymateai.ui.screen.flashCard
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -17,10 +18,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlin.random.Random
 
 @Composable
 fun FlashcardItem(
@@ -29,13 +31,20 @@ fun FlashcardItem(
     index: Int,
     modifier: Modifier = Modifier
 ) {
-    val randomColor = remember(index) {
-        val hue = Random.nextFloat() * 360f
-        Color.hsv(
-            hue = hue,
-            saturation = 0.8f,
-            value = 0.9f,
-            alpha = 0.25f
+    // A soft, glassy gradient: a varied hue (by index) blended toward an on-brand
+    // tint, rendered as a translucent two-stop gradient that reads well in both themes.
+    val cardGradient = remember(index) {
+        val hue = ((index * 53) % 360).toFloat()
+        val accent = Color.hsv(hue, 0.5f, 0.9f)
+        val brandTints = listOf(
+            Color(0xFFEEEDFE), // purple
+            Color(0xFFCCF3FA), // cyan
+            Color(0xFFE1F5EE), // teal
+            Color(0xFFFAEEDA)  // amber
+        )
+        val blended = lerp(accent, brandTints[index % brandTints.size], 0.6f)
+        Brush.linearGradient(
+            listOf(blended.copy(alpha = 0.45f), blended.copy(alpha = 0.12f))
         )
     }
 
@@ -45,13 +54,14 @@ fun FlashcardItem(
             .padding(8.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = randomColor
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(cardGradient)
                 .padding(24.dp),
             verticalArrangement = Arrangement.Top
         ) {

@@ -51,7 +51,10 @@ fun PermissionDialog(
             Button(
                 onClick = onConfirm,
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF534AB7), contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {
                 Text(confirmText, fontWeight = FontWeight.Medium)

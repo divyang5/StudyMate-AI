@@ -1,23 +1,20 @@
 package com.divyang.studymateai.data.viewmodel
 
 
-import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.divyang.studymateai.data.repository.AccountRepository
+import com.divyang.studymateai.data.repository.AuthRepository
 import com.divyang.studymateai.shredPrefs.SharedPref
-import com.google.firebase.Firebase
-import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.firestore
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
 
 // ── UI State ──────────────────────────────────────────────────────────────────
 
@@ -34,15 +31,12 @@ data class ProfileUiState(
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
-class ProfileViewModel(
+@HiltViewModel
+class ProfileViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val accountRepository: AccountRepository,
     private val sharedPref: SharedPref
 ) : ViewModel() {
-
-    private val auth = Firebase.auth
-
-    // Collections that store a "userId" field pointing back to the account.
-    // Confirm "flashcards" matches your actual FlashcardViewModel's collection name.
-    private val userOwnedCollections = listOf("chapters", "quizHistory", "flashcards")
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
@@ -52,33 +46,22 @@ class ProfileViewModel(
     }
 
     private fun loadUserProfile() {
-        val user = auth.currentUser
-
-        // ── SharedPref null/empty debug logs ──────────────────────────────────
-        val rawFirstName = sharedPref.getFirstName()
-        val rawLastName  = sharedPref.getLastName()
-
-
-
-        // ── Safe fallback chain ──────────────────────────────────────────────
-        val firstName = rawFirstName?.trim().orEmpty()
-        val lastName  = rawLastName?.trim().orEmpty()
+        val firstName = sharedPref.getFirstName()?.trim().orEmpty()
+        val lastName = sharedPref.getLastName()?.trim().orEmpty()
+        val fallbackName = authRepository.currentDisplayName
 
         // Priority: SharedPref name → Firebase displayName → "User"
         val displayName = when {
-            firstName.isNotEmpty() || lastName.isNotEmpty() ->
-                "$firstName $lastName".trim()
-            user?.displayName?.isNotBlank() == true ->
-                user.displayName!!
+            firstName.isNotEmpty() || lastName.isNotEmpty() -> "$firstName $lastName".trim()
+            !fallbackName.isNullOrBlank() -> fallbackName
             else -> "User"
         }
 
         val initials = buildString {
             if (firstName.isNotEmpty()) append(firstName.first().uppercaseChar())
-            if (lastName.isNotEmpty())  append(lastName.first().uppercaseChar())
+            if (lastName.isNotEmpty()) append(lastName.first().uppercaseChar())
         }.ifEmpty {
-            // fallback initials from Firebase displayName
-            user?.displayName
+            fallbackName
                 ?.split(" ")
                 ?.filter { it.isNotEmpty() }
                 ?.take(2)
@@ -87,12 +70,10 @@ class ProfileViewModel(
                 .ifEmpty { "U" }
         }
 
-        Log.d("PROFILEVIEWMODEL", "Final displayName = '$displayName', initials = '$initials'")
-
         _uiState.update { state ->
             state.copy(
-                displayName    = displayName,
-                email          = user?.email.orEmpty(),
+                displayName = displayName,
+                email = authRepository.currentEmail.orEmpty(),
                 avatarInitials = initials
             )
         }
@@ -102,7 +83,7 @@ class ProfileViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoggingOut = true, errorMessage = null) }
             try {
-                auth.signOut()
+                authRepository.signOut()
                 _uiState.update { it.copy(isLoggingOut = false, logoutSuccess = true) }
             } catch (e: Exception) {
                 _uiState.update {
@@ -116,17 +97,16 @@ class ProfileViewModel(
     }
 
     /**
-     * Deletes the account permanently. Password is required and verified
-     * (via reauthenticate) BEFORE anything is deleted — so a wrong password
-     * never leaves the account in a half-deleted state.
+     * Deletes the account permanently. Password is verified (via reauthenticate)
+     * BEFORE anything is deleted — so a wrong password never leaves the account
+     * in a half-deleted state.
      */
     fun deleteAccount(password: String) {
-        val user = auth.currentUser
-        if (user == null) {
+        val email = authRepository.currentEmail
+        if (authRepository.currentUserId == null) {
             _uiState.update { it.copy(errorMessage = "No authenticated user found") }
             return
         }
-        val email = user.email
         if (email.isNullOrBlank()) {
             _uiState.update { it.copy(errorMessage = "Could not verify account email") }
             return
@@ -139,45 +119,22 @@ class ProfileViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isDeletingAccount = true, errorMessage = null) }
             try {
-                // 1. Verify password FIRST. Nothing gets deleted until this succeeds.
-                //    This also refreshes the session so the Auth deletion in step 4
-                //    never throws a "recent login required" error.
-                val credential = EmailAuthProvider.getCredential(email, password)
-                user.reauthenticate(credential).await()
+                // 1. Verify password FIRST (also refreshes the session for step 3).
+                authRepository.reauthenticate(email, password)
 
-                val uid = user.uid
-                val firestore = Firebase.firestore
+                val uid = authRepository.currentUserId
+                    ?: throw IllegalStateException("No authenticated user found")
 
-                // 2. Delete every doc across all user-owned collections.
-                for (collectionName in userOwnedCollections) {
-                    val snapshot = firestore.collection(collectionName)
-                        .whereEqualTo("userId", uid)
-                        .get()
-                        .await()
+                // 2. Cascade-delete all Firestore data + the user profile doc.
+                accountRepository.deleteAccountData(uid)
 
-                    if (snapshot.isEmpty) continue
+                // 3. Delete the Firebase Auth account (session is fresh from step 1).
+                authRepository.deleteCurrentUser()
 
-                    snapshot.documents.chunked(500).forEach { chunk ->
-                        val batch = firestore.batch()
-                        chunk.forEach { doc -> batch.delete(doc.reference) }
-                        batch.commit().await()
-                    }
-                    Log.d("PROFILEVIEWMODEL", "Deleted ${snapshot.size()} docs from $collectionName")
-                }
-
-                // 3. Delete the root user profile document.
-                firestore.collection("users").document(uid).delete().await()
-
-                // 4. Delete the Firebase Auth account — session is fresh from
-                //    step 1, so this succeeds without a recent-login error.
-                user.delete().await()
-
-                // 5. Sign out (redundant after delete(), but explicit) and wipe
-                //    all locally cached data so nothing stale remains.
-                auth.signOut()
+                // 4. Sign out + wipe local session cache.
+                authRepository.signOut()
                 sharedPref.clearUserSession()
 
-                Log.d("PROFILEVIEWMODEL", "Account fully deleted: $uid")
                 _uiState.update { it.copy(isDeletingAccount = false, accountDeleted = true) }
             } catch (e: FirebaseAuthInvalidCredentialsException) {
                 Log.e("PROFILEVIEWMODEL", "Incorrect password on account deletion", e)
@@ -201,17 +158,5 @@ class ProfileViewModel(
 
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
-    }
-
-    // ── Factory ───────────────────────────────────────────────────────────────
-
-    class Factory(private val context: Context) : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            require(modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
-                "Unknown ViewModel class: ${modelClass.name}"
-            }
-            return ProfileViewModel(SharedPref(context)) as T
-        }
     }
 }

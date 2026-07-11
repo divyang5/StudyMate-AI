@@ -5,18 +5,17 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.divyang.studymateai.data.model.chapters.Chapter
+import com.divyang.studymateai.data.repository.AuthRepository
+import com.divyang.studymateai.data.repository.ChapterRepository
+import com.divyang.studymateai.data.repository.UserRepository
 import com.divyang.studymateai.utils.AuthEventBus
-import com.google.firebase.Firebase
-import com.google.firebase.auth.UserProfileChangeRequest
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FirebaseFirestoreException
-import com.google.firebase.firestore.firestore
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
 
 // ─── UI State ───────────────────────────────────────────────────────────────
 
@@ -35,10 +34,12 @@ data class HomeUiState(
 
 // ─── ViewModel ──────────────────────────────────────────────────────────────
 
-class HomeViewModel : ViewModel() {
-
-    private val auth = Firebase.auth
-    private val firestore = Firebase.firestore
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val userRepository: UserRepository,
+    private val chapterRepository: ChapterRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -46,8 +47,6 @@ class HomeViewModel : ViewModel() {
     init {
         loadAll()
     }
-
-    // ── Public API ───────────────────────────────────────────────────────────
 
     fun refresh() {
         _uiState.update { it.copy(isRefreshing = true) }
@@ -57,8 +56,6 @@ class HomeViewModel : ViewModel() {
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
-
-    // ── Private Helpers ──────────────────────────────────────────────────────
 
     private fun loadAll(isRefresh: Boolean = false) {
         viewModelScope.launch {
@@ -71,39 +68,18 @@ class HomeViewModel : ViewModel() {
     }
 
     private suspend fun loadUser() {
-        val userId = auth.currentUser?.uid
+        val userId = authRepository.currentUserId
         if (userId == null) {
             _uiState.update { it.copy(isUserLoading = false) }
             AuthEventBus.notifySessionExpired()
             return
         }
         try {
-            val doc = firestore.collection("users").document(userId).get().await()
-            val first = doc.getString("firstName") ?: ""
-            val last  = doc.getString("lastName")  ?: ""
-
+            val profile = userRepository.getUserProfile(userId)
             _uiState.update {
-                it.copy(firstName = first, lastName = last, isUserLoading = false)
+                it.copy(firstName = profile.firstName, lastName = profile.lastName, isUserLoading = false)
             }
-
-
-            val request = UserProfileChangeRequest.Builder()
-                .setDisplayName("$first $last")
-                .build()
-            auth.currentUser?.updateProfile(request)?.await()
-
-            Log.d(TAG, "User loaded: $first $last")
-        } catch (e: FirebaseFirestoreException) {
-            if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED ||
-                e.code == FirebaseFirestoreException.Code.UNAUTHENTICATED
-            ) {
-                Log.e(TAG, "Session invalid while fetching user", e)
-                _uiState.update { it.copy(isUserLoading = false) }
-                AuthEventBus.notifySessionExpired()
-            } else {
-                Log.e(TAG, "Firestore error fetching user", e)
-                _uiState.update { it.copy(isUserLoading = false, error = "Failed to load user data") }
-            }
+            authRepository.updateDisplayName("${profile.firstName} ${profile.lastName}".trim())
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching user", e)
             _uiState.update { it.copy(isUserLoading = false, error = "Failed to load user data") }
@@ -111,7 +87,7 @@ class HomeViewModel : ViewModel() {
     }
 
     private suspend fun loadChapters() {
-        val userId = auth.currentUser?.uid
+        val userId = authRepository.currentUserId
         if (userId == null) {
             _uiState.update { it.copy(isChaptersLoading = false) }
             AuthEventBus.notifySessionExpired()
@@ -119,46 +95,11 @@ class HomeViewModel : ViewModel() {
         }
         _uiState.update { it.copy(isChaptersLoading = true) }
         try {
-            val snapshot = firestore.collection("chapters")
-                .whereEqualTo("userId", userId)
-                .limit(5)
-                .get()
-                .await()
-
-            val list = snapshot.documents
-                .mapNotNull { doc ->
-                    doc.getDate("createdAt")?.let { date ->
-                        Chapter(
-                            id          = doc.id,
-                            title       = doc.getString("title")       ?: "",
-                            description = doc.getString("description") ?: "",
-                            content     = doc.getString("content")     ?: "",
-                            createdAt   = date
-                        )
-                    }
-                }
-                .sortedByDescending { it.createdAt }
-
+            val list = chapterRepository.getRecentChapters(userId)
             _uiState.update { it.copy(chapters = list, isChaptersLoading = false) }
-            Log.d(TAG, "Chapters loaded: ${list.size}")
-        } catch (e: FirebaseFirestoreException) {
-            if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED ||
-                e.code == FirebaseFirestoreException.Code.UNAUTHENTICATED
-            ) {
-                Log.e(TAG, "Session invalid while fetching chapters", e)
-                _uiState.update { it.copy(isChaptersLoading = false) }
-                AuthEventBus.notifySessionExpired()
-            } else {
-                Log.e(TAG, "Firestore error fetching chapters", e)
-                _uiState.update {
-                    it.copy(isChaptersLoading = false, error = "Failed to load chapters")
-                }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching chapters", e)
-            _uiState.update {
-                it.copy(isChaptersLoading = false, error = "Failed to load chapters")
-            }
+            _uiState.update { it.copy(isChaptersLoading = false, error = "Failed to load chapters") }
         }
     }
 

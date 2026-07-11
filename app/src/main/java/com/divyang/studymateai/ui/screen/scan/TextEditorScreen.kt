@@ -46,10 +46,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.divyang.studymateai.data.viewmodel.TextEditorViewModel
 import com.divyang.studymateai.navigation.Routes
+import com.divyang.studymateai.ui.components.AppColors
+import com.divyang.studymateai.ui.components.AppTopBar
 import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,7 +62,7 @@ fun TextEditorScreen(
     extractedText: String = "",
     chapterId: String? = null,
     navController: NavController,
-    viewModel: TextEditorViewModel = viewModel()
+    viewModel: TextEditorViewModel = hiltViewModel()
 ) {
     LaunchedEffect(Unit) {
         viewModel.init(
@@ -84,44 +86,10 @@ fun TextEditorScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = if (chapterId != null) "Edit Chapter" else "New Chapter",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Surface(shape = CircleShape, color = Color(0xFFEEEDFE)) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = Color(0xFF534AB7),
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .padding(6.dp)
-                                )
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    )
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(Color(0xFF534AB7), Color(0xFF1D9E75))
-                            )
-                        )
-                )
-            }
+            AppTopBar(
+                title = if (chapterId != null) "Edit Chapter" else "New Chapter",
+                onBack = { navController.popBackStack() }
+            )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
@@ -200,19 +168,19 @@ fun TextEditorScreen(
                         ) { popUpTo("textEditor") { inclusive = true } }
                     },
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(0.5.dp, Color(0xFF534AB7)),
+                    border = BorderStroke(0.5.dp, AppColors.Purple),
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp)
                 ) {
-                    Text("Scan More", color = Color(0xFF534AB7))
+                    Text("Scan More", color = AppColors.Purple)
                 }
 
                 Button(
                     onClick = { viewModel.save() },
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF534AB7),
+                        containerColor = AppColors.Purple,
                         contentColor   = Color.White
                     ),
                     modifier = Modifier
@@ -245,7 +213,7 @@ fun TextEditorScreen(
             confirmButton = {
                 Button(
                     onClick = { viewModel.clearError() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF534AB7))
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Purple)
                 ) { Text("OK") }
             },
             shape = RoundedCornerShape(16.dp)
@@ -265,8 +233,8 @@ private fun EditorSectionLabel(text: String) {
 
 @Composable
 private fun outlinedFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor   = Color(0xFF534AB7),
-    unfocusedBorderColor = Color(0xFF534AB7).copy(alpha = 0.25f),
-    focusedLabelColor    = Color(0xFF534AB7),
-    cursorColor          = Color(0xFF534AB7)
+    focusedBorderColor   = AppColors.Purple,
+    unfocusedBorderColor = AppColors.Purple.copy(alpha = 0.25f),
+    focusedLabelColor    = AppColors.Purple,
+    cursorColor          = AppColors.Purple
 )

@@ -12,23 +12,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.Divider
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,8 +33,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.divyang.studymateai.data.viewmodel.ChangeEmailViewModel
+import com.divyang.studymateai.ui.components.AppTopBar
 import kotlinx.coroutines.launch
 
 
@@ -53,14 +48,11 @@ fun ChangeEmailScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val userState by viewModel.userState.collectAsState()
-    val currentEmailState = remember { mutableStateOf(userState.email) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val newEmailState = remember { mutableStateOf("") }
     val passwordState = remember { mutableStateOf("") }
-    val isUpdating = viewModel.updateState.collectAsState().value
     val isSendingVerification = remember { mutableStateOf(false) }
 
-    // Handle messages
     LaunchedEffect(Unit) {
         viewModel.messageFlow.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -70,31 +62,9 @@ fun ChangeEmailScreen(
         }
     }
 
-    // Update local state when userState changes
-    LaunchedEffect(userState) {
-        currentEmailState.value = userState.email
-    }
-
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = ("Change Email"),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
+        topBar = { AppTopBar(title = "Change Email", onBack = { navController.popBackStack() }) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(
             modifier = Modifier
@@ -103,39 +73,34 @@ fun ChangeEmailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (userState.uid.isEmpty()) {
-                // Loading state
+            if (uiState.uid.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             } else {
-                // Current email display with verification status
                 Column {
-                    // Current Email Address
                     Text(
                         text = "Current Email:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = currentEmailState.value,
+                        text = uiState.email,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Verification status with icon and resend button
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = if (viewModel.isEmailVerified()) "Verified"
-                            else "Not Verified",
-                            color = if (viewModel.isEmailVerified()) MaterialTheme.colorScheme.primary
+                            text = if (uiState.isEmailVerified) "Verified" else "Not Verified",
+                            color = if (uiState.isEmailVerified) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.error
                         )
                     }
 
-                    if (!viewModel.isEmailVerified()) {
+                    if (!uiState.isEmailVerified) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(
                             onClick = {
@@ -169,13 +134,11 @@ fun ChangeEmailScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Divider
-                Divider(
+                HorizontalDivider(
                     modifier = Modifier.padding(vertical = 8.dp),
                     color = MaterialTheme.colorScheme.outlineVariant
                 )
 
-                // New Email Section
                 Text(
                     text = "Enter New Email Address",
                     style = MaterialTheme.typography.bodyMedium,
@@ -193,10 +156,9 @@ fun ChangeEmailScreen(
                             Text("Please enter a valid email address")
                         }
                     },
-                    enabled = viewModel.isEmailVerified()
+                    enabled = uiState.isEmailVerified
                 )
 
-                // Password for verification
                 OutlinedTextField(
                     value = passwordState.value,
                     onValueChange = { passwordState.value = it },
@@ -210,21 +172,18 @@ fun ChangeEmailScreen(
                             Text("Password is required")
                         }
                     },
-                    enabled = viewModel.isEmailVerified()
+                    enabled = uiState.isEmailVerified
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Update button
                 Button(
                     onClick = {
                         if (android.util.Patterns.EMAIL_ADDRESS.matcher(newEmailState.value).matches()) {
-                            scope.launch {
-                                viewModel.updateEmail(
-                                    newEmail = newEmailState.value,
-                                    password = passwordState.value
-                                )
-                            }
+                            viewModel.updateEmail(
+                                newEmail = newEmailState.value,
+                                password = passwordState.value
+                            )
                         } else {
                             Toast.makeText(context, "Please enter a valid email", Toast.LENGTH_SHORT).show()
                         }
@@ -232,11 +191,11 @@ fun ChangeEmailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    enabled = !isUpdating && viewModel.isEmailVerified() &&
+                    enabled = !uiState.isUpdating && uiState.isEmailVerified &&
                             newEmailState.value.isNotBlank() &&
                             passwordState.value.isNotBlank()
                 ) {
-                    if (isUpdating) {
+                    if (uiState.isUpdating) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
                             color = MaterialTheme.colorScheme.onPrimary,

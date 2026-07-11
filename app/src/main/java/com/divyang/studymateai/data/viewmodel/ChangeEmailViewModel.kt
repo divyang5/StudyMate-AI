@@ -3,28 +3,32 @@ package com.divyang.studymateai.data.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.divyang.studymateai.data.model.profile.UserProfile
-import com.google.firebase.auth.EmailAuthProvider
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.divyang.studymateai.data.repository.AuthRepository
+import com.divyang.studymateai.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class ChangeEmailUiState(
+    val uid: String = "",
+    val email: String = "",
+    val isEmailVerified: Boolean = false,
+    val isUpdating: Boolean = false
+)
+
 @HiltViewModel
 class ChangeEmailViewModel @Inject constructor(
-    private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val authRepository: AuthRepository,
+    private val userRepository: UserRepository
 ) : ViewModel() {
-    private val _userState = MutableStateFlow(UserProfile())
-    val userState = _userState.asStateFlow()
 
-    private val _updateState = MutableStateFlow(false)
-    val updateState = _updateState.asStateFlow()
+    private val _uiState = MutableStateFlow(ChangeEmailUiState())
+    val uiState = _uiState.asStateFlow()
 
     private val _messageFlow = Channel<String>()
     val messageFlow = _messageFlow.receiveAsFlow()
@@ -34,127 +38,72 @@ class ChangeEmailViewModel @Inject constructor(
     }
 
     fun loadUserProfile() {
-        val userId = auth.currentUser?.uid ?: return
-        firestore.collection("users").document(userId)
-            .get()
-            .addOnSuccessListener { document ->
-                _userState.value = UserProfile(
-                    uid = document.id,
-                    firstName = document.getString("firstName") ?: "",
-                    lastName = document.getString("lastName") ?: "",
-                    email = document.getString("email") ?: auth.currentUser?.email ?: "",
-                    createdAt = document.getTimestamp("createdAt")
-                )
+        val userId = authRepository.currentUserId ?: return
+        viewModelScope.launch {
+            try {
+                val profile = userRepository.getUserProfile(userId)
+                _uiState.update {
+                    it.copy(
+                        uid = profile.uid.ifBlank { userId },
+                        email = profile.email.ifBlank { authRepository.currentEmail.orEmpty() },
+                        isEmailVerified = authRepository.isEmailVerified()
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("CHANGEEMAIL", "Failed to load profile", e)
+                _messageFlow.send("Failed to load profile")
             }
+        }
     }
 
+    /** Sequential rewrite of the former nested addOnCompleteListener pyramid. */
     fun updateEmail(newEmail: String, password: String) {
         if (newEmail.isEmpty() || password.isEmpty()) {
-            viewModelScope.launch {
-                _messageFlow.send("Please fill all fields")
-            }
+            viewModelScope.launch { _messageFlow.send("Please fill all fields") }
             return
         }
 
-        _updateState.value = true
-        val user = auth.currentUser
-        val currentEmail = auth.currentUser?.email ?: ""
-
-        if (user == null) {
-            viewModelScope.launch {
-                _updateState.value = false
-                _messageFlow.send("User not authenticated")
-            }
-            return
-        }
-
-        // Reload user to get the latest verification status
-        user.reload().addOnCompleteListener { reloadTask ->
-            if (reloadTask.isSuccessful) {
-                val reloadedUser = auth.currentUser
-                if (reloadedUser == null || !reloadedUser.isEmailVerified) {
-                    viewModelScope.launch {
-                        _updateState.value = false
-                        _messageFlow.send("Please verify your current email first")
-                    }
-                    return@addOnCompleteListener
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUpdating = true) }
+            try {
+                // 1. Refresh to get the latest verification status.
+                authRepository.reloadUser()
+                if (!authRepository.isEmailVerified()) {
+                    _uiState.update { it.copy(isUpdating = false, isEmailVerified = false) }
+                    _messageFlow.send("Please verify your current email first")
+                    return@launch
                 }
 
-                // Re-authenticate user
-                val credential = EmailAuthProvider.getCredential(currentEmail, password)
-                reloadedUser.reauthenticate(credential)
-                    .addOnCompleteListener { reAuthTask ->
-                        if (reAuthTask.isSuccessful) {
-                            // Update email in Firebase Auth
-                            reloadedUser.verifyBeforeUpdateEmail(newEmail)
-                                .addOnCompleteListener { updateTask ->
-                                    if (updateTask.isSuccessful) {
-                                        // Update email in Firestore
-                                        firestore.collection("users").document(reloadedUser.uid)
-                                            .update("email", newEmail)
-                                            .addOnSuccessListener {
-                                                // Send verification to new email
-                                                reloadedUser.sendEmailVerification()
-                                                    .addOnCompleteListener { verificationTask ->
-                                                        viewModelScope.launch {
-                                                            _updateState.value = false
-                                                            if (verificationTask.isSuccessful) {
-                                                                _messageFlow.send("Email updated! Please verify your new email")
-                                                                _userState.value = _userState.value.copy(email = newEmail)
-                                                            } else {
-                                                                _messageFlow.send("Email updated but verification failed: ${verificationTask.exception?.message}")
-                                                            }
-                                                        }
-                                                    }
-                                            }
-                                            .addOnFailureListener { e ->
-                                                viewModelScope.launch {
-                                                    _updateState.value = false
-                                                    _messageFlow.send("Failed to update database: ${e.message}")
+                val currentEmail = authRepository.currentEmail ?: ""
+                // 2. Re-authenticate, 3. queue the verified email change, 4. mirror in Firestore.
+                authRepository.reauthenticate(currentEmail, password)
+                authRepository.verifyBeforeUpdateEmail(newEmail)
 
-                                                    Log.e("CHANGEEMAIL", "Failed to update database", e)
-                                                }
-                                            }
-                                    } else {
-                                        viewModelScope.launch {
-                                            _updateState.value = false
-                                            _messageFlow.send("Update failed: ${updateTask.exception?.message}")
-                                            Log.e("CHANGEEMAIL", "Update failed", updateTask.exception)
-                                        }
-                                    }
-                                }
-                        } else {
-                            viewModelScope.launch {
-                                _updateState.value = false
-                                _messageFlow.send("Authentication failed: ${reAuthTask.exception?.message}")
-                            }
-                        }
-                    }
-            } else {
-                viewModelScope.launch {
-                    _updateState.value = false
-                    _messageFlow.send("Failed to refresh user: ${reloadTask.exception?.message}")
-                }
+                val uid = authRepository.currentUserId
+                    ?: throw IllegalStateException("No authenticated user")
+                userRepository.updateEmail(uid, newEmail)
+
+                // 5. Send verification to the new address.
+                authRepository.sendEmailVerification()
+
+                _uiState.update { it.copy(isUpdating = false, email = newEmail) }
+                _messageFlow.send("Email updated! Please verify your new email")
+            } catch (e: Exception) {
+                Log.e("CHANGEEMAIL", "Update failed", e)
+                _uiState.update { it.copy(isUpdating = false) }
+                _messageFlow.send("Update failed: ${e.message}")
             }
         }
-    }
-
-    fun isEmailVerified(): Boolean {
-        return auth.currentUser?.isEmailVerified ?: false
     }
 
     fun sendVerificationEmail() {
-        auth.currentUser?.sendEmailVerification()
-            ?.addOnCompleteListener { task ->
-                viewModelScope.launch {
-                    if (task.isSuccessful) {
-                        _messageFlow.send("Verification email sent")
-                    } else {
-                        _messageFlow.send("Failed to send verification: ${task.exception?.message}")
-                    }
-                }
+        viewModelScope.launch {
+            try {
+                authRepository.sendEmailVerification()
+                _messageFlow.send("Verification email sent")
+            } catch (e: Exception) {
+                _messageFlow.send("Failed to send verification: ${e.message}")
             }
+        }
     }
 }
-
-
