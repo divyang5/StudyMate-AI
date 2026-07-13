@@ -3,6 +3,8 @@ package com.divyang.studymateai.data.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.divyang.studymateai.data.repository.AuthRepository
+import com.divyang.studymateai.data.repository.UserRepository
+import com.divyang.studymateai.shredPrefs.SharedPref
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +26,9 @@ data class LoginUiState(
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val userRepository: UserRepository,
+    private val sharedPref: SharedPref
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -79,6 +83,27 @@ class LoginViewModel @Inject constructor(
             try {
                 val user = authRepository.signIn(state.email.trim(), state.password)
                 if (user.isEmailVerified) {
+                    // Cache this account's terms acceptance from Firestore
+                    // before landing — the NavHost routes to the terms gate or
+                    // Home based on it. Unknown (fetch failed / legacy doc
+                    // without the field) defaults to 0, which re-gates; a
+                    // harmless second Accept just rewrites the same record.
+                    val termsVersion = try {
+                        val profile = userRepository.getUserProfile(user.uid)
+                        // A verified email change only lands in Firebase Auth;
+                        // mirror it into the profile document here, since the
+                        // change happens outside the app (email link).
+                        val authEmail = user.email
+                        if (!authEmail.isNullOrBlank() &&
+                            !profile.email.equals(authEmail, ignoreCase = true)
+                        ) {
+                            userRepository.updateEmail(user.uid, authEmail)
+                        }
+                        profile.termsAcceptedVersion
+                    } catch (e: Exception) {
+                        0
+                    }
+                    sharedPref.setTermsAcceptedVersion(termsVersion)
                     _uiState.update { it.copy(isLoading = false, loginSuccess = true) }
                 } else {
                     // Block login but leave them authenticated so we can resend verification.

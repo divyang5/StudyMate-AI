@@ -88,10 +88,13 @@ sealed class Routes(val route: String) {
         const val KEY_SCANNED_TEXT = "scanned_text"
 
         fun getStartDestination(isLoggedIn: Boolean, termsAccepted: Boolean = true): String {
+            // Terms acceptance is account-level: anonymous visitors go to
+            // Login, and only a signed-in account that hasn't accepted the
+            // current terms version is gated.
             return when {
+                !isLoggedIn -> Login.route
                 !termsAccepted -> Terms.route
-                isLoggedIn -> Home.route
-                else -> Login.route
+                else -> Home.route
             }
         }
     }

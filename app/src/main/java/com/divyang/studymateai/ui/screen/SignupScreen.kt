@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -23,12 +26,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.divyang.studymateai.data.viewmodel.SignUpViewModel
+import com.divyang.studymateai.ui.components.AppColors
 import com.divyang.studymateai.ui.components.AuthScreenScaffold
 import com.divyang.studymateai.ui.components.AuthTextField
 import com.divyang.studymateai.ui.components.PrimaryButton
@@ -37,6 +47,8 @@ import com.divyang.studymateai.ui.components.PrimaryButton
 fun SignUpScreen(
     onSignUpSuccess: () -> Unit,
     onLoginClick: () -> Unit,
+    onTermsClick: () -> Unit = {},
+    onPrivacyClick: () -> Unit = {},
     viewModel: SignUpViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -117,7 +129,47 @@ fun SignUpScreen(
             errorText = uiState.confirmPasswordError
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(12.dp))
+
+        // No account without explicit agreement: sign-up is blocked until the
+        // box is checked, and acceptance is recorded on the user's profile.
+        val linkStyle = TextLinkStyles(
+            style = SpanStyle(color = AppColors.Purple, fontWeight = FontWeight.Medium)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = uiState.termsAgreed,
+                onCheckedChange = viewModel::onTermsAgreedChange,
+                colors = CheckboxDefaults.colors(checkedColor = AppColors.Purple)
+            )
+            Text(
+                text = buildAnnotatedString {
+                    append("I agree to the ")
+                    withLink(LinkAnnotation.Clickable("terms", linkStyle) { onTermsClick() }) {
+                        append("Terms & Conditions")
+                    }
+                    append(" and ")
+                    withLink(LinkAnnotation.Clickable("privacy", linkStyle) { onPrivacyClick() }) {
+                        append("Privacy Policy")
+                    }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        uiState.termsError?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = 12.dp)
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         PrimaryButton(
             text = "Create account",

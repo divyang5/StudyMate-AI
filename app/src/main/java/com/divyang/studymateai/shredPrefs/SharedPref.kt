@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.divyang.studymateai.legal.TermsPolicy
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 
@@ -42,9 +43,10 @@ class SharedPref(context: Context?) {
 
     fun clearUserSession() {
         // Logout destroys the personal Gemini API key along with the session.
-        // The daily quota and terms acceptance survive: they are device-level,
-        // and clearing the quota would let users reset the free limit by
-        // logging out and back in.
+        // The daily quota survives: it is device-level, and clearing it would
+        // let users reset the free limit by logging out and back in. The terms
+        // cache is cleared because acceptance is account-level (Firestore) —
+        // the next account must be gated by its own record.
         pref.edit {
             remove("IS_LOGGED_IN")
             remove("FIREBASE_UID")
@@ -52,6 +54,8 @@ class SharedPref(context: Context?) {
             remove("LAST_NAME")
             remove("EMAIL")
             remove(KEY_GEMINI_USER_KEY)
+            remove(KEY_TERMS_ACCEPTED_VERSION)
+            remove(KEY_TERMS_ACCEPTED_AT)
         }
     }
 
@@ -101,17 +105,25 @@ class SharedPref(context: Context?) {
         }
     }
 
-    // ── Terms & Conditions acceptance (device-level, survives logout) ───────
+    // ── Terms & Conditions acceptance ────────────────────────────────────────
+    // Local cache of the account's Firestore `termsAcceptedVersion`, synced at
+    // login and cleared on logout, so the NavHost can gate synchronously at
+    // cold start without a network read.
 
     fun isTermsAccepted(): Boolean =
-        pref.getInt(KEY_TERMS_ACCEPTED_VERSION, 0) >= TERMS_VERSION
+        pref.getInt(KEY_TERMS_ACCEPTED_VERSION, 0) >= TermsPolicy.VERSION
 
     /** Records acceptance of the current terms version with a timestamp. */
     fun setTermsAccepted() {
         pref.edit {
-            putInt(KEY_TERMS_ACCEPTED_VERSION, TERMS_VERSION)
+            putInt(KEY_TERMS_ACCEPTED_VERSION, TermsPolicy.VERSION)
             putLong(KEY_TERMS_ACCEPTED_AT, System.currentTimeMillis())
         }
+    }
+
+    /** Syncs the cached acceptance from the account's Firestore value. */
+    fun setTermsAcceptedVersion(version: Int) {
+        pref.edit { putInt(KEY_TERMS_ACCEPTED_VERSION, version) }
     }
 
     private companion object {
@@ -119,9 +131,6 @@ class SharedPref(context: Context?) {
         const val KEY_QUOTA_DATE = "GEMINI_QUOTA_DATE"
         const val KEY_QUOTA_USED = "GEMINI_QUOTA_USED"
 
-        // Bump when the Terms & Conditions change materially — every user is
-        // asked to accept again on next launch.
-        const val TERMS_VERSION = 1
         const val KEY_TERMS_ACCEPTED_VERSION = "TERMS_ACCEPTED_VERSION"
         const val KEY_TERMS_ACCEPTED_AT = "TERMS_ACCEPTED_AT"
     }

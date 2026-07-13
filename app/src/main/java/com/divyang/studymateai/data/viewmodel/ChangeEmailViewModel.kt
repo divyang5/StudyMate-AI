@@ -18,7 +18,10 @@ data class ChangeEmailUiState(
     val uid: String = "",
     val email: String = "",
     val isEmailVerified: Boolean = false,
-    val isUpdating: Boolean = false
+    val isUpdating: Boolean = false,
+    // Non-null once a verification link is on its way to the new address —
+    // the screen switches to the "check your inbox" state.
+    val verificationSentTo: String? = null
 )
 
 @HiltViewModel
@@ -56,17 +59,27 @@ class ChangeEmailViewModel @Inject constructor(
         }
     }
 
-    /** Sequential rewrite of the former nested addOnCompleteListener pyramid. */
-    fun updateEmail(newEmail: String, password: String) {
+    /**
+     * Starts a verified email change: re-authenticate with the password, then
+     * let Firebase send a verification link to the NEW address. Nothing is
+     * changed yet — the email (and our Firestore mirror, synced at next
+     * login) only updates after the user clicks that link, at which point
+     * Firebase revokes the session and they sign back in with the new email.
+     */
+    fun requestEmailChange(newEmail: String, password: String) {
         if (newEmail.isEmpty() || password.isEmpty()) {
             viewModelScope.launch { _messageFlow.send("Please fill all fields") }
+            return
+        }
+        if (newEmail.equals(_uiState.value.email, ignoreCase = true)) {
+            viewModelScope.launch { _messageFlow.send("That is already your current email") }
             return
         }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isUpdating = true) }
             try {
-                // 1. Refresh to get the latest verification status.
+                // Refresh to get the latest verification status.
                 authRepository.reloadUser()
                 if (!authRepository.isEmailVerified()) {
                     _uiState.update { it.copy(isUpdating = false, isEmailVerified = false) }
@@ -75,23 +88,28 @@ class ChangeEmailViewModel @Inject constructor(
                 }
 
                 val currentEmail = authRepository.currentEmail ?: ""
-                // 2. Re-authenticate, 3. queue the verified email change, 4. mirror in Firestore.
                 authRepository.reauthenticate(currentEmail, password)
                 authRepository.verifyBeforeUpdateEmail(newEmail)
 
-                val uid = authRepository.currentUserId
-                    ?: throw IllegalStateException("No authenticated user")
-                userRepository.updateEmail(uid, newEmail)
-
-                // 5. Send verification to the new address.
-                authRepository.sendEmailVerification()
-
-                _uiState.update { it.copy(isUpdating = false, email = newEmail) }
-                _messageFlow.send("Email updated! Please verify your new email")
+                _uiState.update {
+                    it.copy(isUpdating = false, verificationSentTo = newEmail)
+                }
             } catch (e: Exception) {
-                Log.e("CHANGEEMAIL", "Update failed", e)
+                Log.e("CHANGEEMAIL", "Email change request failed", e)
+                val message = when {
+                    e.message?.contains("credential", ignoreCase = true) == true ||
+                        e.message?.contains("password", ignoreCase = true) == true ->
+                        "Incorrect password"
+                    e.message?.contains("already in use", ignoreCase = true) == true ->
+                        "This email is already used by another account"
+                    e.message?.contains("badly formatted", ignoreCase = true) == true ->
+                        "Enter a valid email address"
+                    e.message?.contains("network", ignoreCase = true) == true ->
+                        "Network error. Check your connection"
+                    else -> "Couldn't start the email change. Please try again"
+                }
                 _uiState.update { it.copy(isUpdating = false) }
-                _messageFlow.send("Update failed: ${e.message}")
+                _messageFlow.send(message)
             }
         }
     }

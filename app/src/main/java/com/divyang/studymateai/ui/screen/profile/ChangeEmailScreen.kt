@@ -56,9 +56,6 @@ fun ChangeEmailScreen(
     LaunchedEffect(Unit) {
         viewModel.messageFlow.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            if (message.contains("success", ignoreCase = true)) {
-                navController.popBackStack()
-            }
         }
     }
 
@@ -76,6 +73,36 @@ fun ChangeEmailScreen(
             if (uiState.uid.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
+                }
+            } else if (uiState.verificationSentTo != null) {
+                // Change requested — nothing switches until the link is opened.
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Verify your new email",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "We sent a verification link to ${uiState.verificationSentTo}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Your email will only change after you open that link. If you " +
+                            "never open it, your account keeps using ${uiState.email}. Once " +
+                            "verified, you'll be signed out — sign back in with your new email.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    ) {
+                        Text("Done")
+                    }
                 }
             } else {
                 Column {
@@ -144,6 +171,12 @@ fun ChangeEmailScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Text(
+                    text = "We'll send a verification link to the new address. Your email " +
+                        "only changes after you open that link.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
                 OutlinedTextField(
                     value = newEmailState.value,
@@ -180,8 +213,8 @@ fun ChangeEmailScreen(
                 Button(
                     onClick = {
                         if (android.util.Patterns.EMAIL_ADDRESS.matcher(newEmailState.value).matches()) {
-                            viewModel.updateEmail(
-                                newEmail = newEmailState.value,
+                            viewModel.requestEmailChange(
+                                newEmail = newEmailState.value.trim(),
                                 password = passwordState.value
                             )
                         } else {
@@ -202,7 +235,7 @@ fun ChangeEmailScreen(
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Text("Update Email")
+                        Text("Send Verification Link")
                     }
                 }
             }

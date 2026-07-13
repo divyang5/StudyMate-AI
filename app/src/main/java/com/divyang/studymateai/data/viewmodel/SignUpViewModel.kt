@@ -18,12 +18,14 @@ data class SignUpUiState(
     val email: String = "",
     val password: String = "",
     val confirmPassword: String = "",
+    val termsAgreed: Boolean = false,
     val isLoading: Boolean = false,
     val firstNameError: String? = null,
     val lastNameError: String? = null,
     val emailError: String? = null,
     val passwordError: String? = null,
     val confirmPasswordError: String? = null,
+    val termsError: String? = null,
     val generalError: String? = null,
     val showVerificationDialog: Boolean = false,
     val signUpSuccessEmail: String = ""
@@ -43,6 +45,7 @@ class SignUpViewModel @Inject constructor(
     fun onEmailChange(v: String) = _uiState.update { it.copy(email = v, emailError = null, generalError = null) }
     fun onPasswordChange(v: String) = _uiState.update { it.copy(password = v, passwordError = null) }
     fun onConfirmPasswordChange(v: String) = _uiState.update { it.copy(confirmPassword = v, confirmPasswordError = null) }
+    fun onTermsAgreedChange(v: Boolean) = _uiState.update { it.copy(termsAgreed = v, termsError = null) }
 
     fun dismissVerificationDialog() {
         authRepository.signOut()
@@ -72,15 +75,20 @@ class SignUpViewModel @Inject constructor(
             s.confirmPassword != s.password -> "Passwords don't match"
             else -> null
         }
+        // No account without agreeing — profile creation records the
+        // acceptance (version + timestamp) on the Firestore user document.
+        val termsError =
+            if (!s.termsAgreed) "You must accept the Terms & Conditions to create an account" else null
 
-        if (listOf(firstNameError, lastNameError, emailError, passwordError, confirmPasswordError).any { it != null }) {
+        if (listOf(firstNameError, lastNameError, emailError, passwordError, confirmPasswordError, termsError).any { it != null }) {
             _uiState.update {
                 it.copy(
                     firstNameError = firstNameError,
                     lastNameError = lastNameError,
                     emailError = emailError,
                     passwordError = passwordError,
-                    confirmPasswordError = confirmPasswordError
+                    confirmPasswordError = confirmPasswordError,
+                    termsError = termsError
                 )
             }
             return

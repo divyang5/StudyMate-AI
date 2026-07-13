@@ -81,7 +81,11 @@ fun StudyMateNavHost(
         composable(Routes.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate(Routes.Home.route) {
+                    // The ViewModel cached the account's Firestore terms
+                    // acceptance before flagging success — gate if it's stale.
+                    val destination =
+                        if (sharedPref.isTermsAccepted()) Routes.Home.route else Routes.Terms.route
+                    navController.navigate(destination) {
                         popUpTo(Routes.Login.route) { inclusive = true }
                     }
                 },
@@ -102,7 +106,9 @@ fun StudyMateNavHost(
                         popUpTo(Routes.Login.route) { inclusive = true }
                     }
                 },
-                onLoginClick = { navController.popBackStack() }
+                onLoginClick = { navController.popBackStack() },
+                onTermsClick = { navController.navigate(Routes.Terms.route) },
+                onPrivacyClick = { navController.navigate(Routes.PrivacyPolicy.route) }
             )
         }
 
@@ -281,18 +287,18 @@ fun StudyMateNavHost(
         }
 
         composable(Routes.Terms.route) {
-            // Gate mode until accepted; read-only when opened from settings.
-            val requireAcceptance = !sharedPref.isTermsAccepted()
+            // Gate mode only for a signed-in account that hasn't accepted the
+            // current terms version. Previews (sign-up links, App settings)
+            // are read-only. The screen itself records the acceptance in
+            // Firestore before invoking onAccepted.
+            val requireAcceptance = sharedPref.isLoggedIn() &&
+                auth.currentUser != null &&
+                !sharedPref.isTermsAccepted()
             TermsAndConditionsScreen(
                 navController = navController,
                 requireAcceptance = requireAcceptance,
                 onAccepted = {
-                    sharedPref.setTermsAccepted()
-                    navController.navigate(
-                        Routes.getStartDestination(
-                            isLoggedIn = sharedPref.isLoggedIn() && auth.currentUser != null
-                        )
-                    ) {
+                    navController.navigate(Routes.Home.route) {
                         popUpTo(0)
                     }
                 }

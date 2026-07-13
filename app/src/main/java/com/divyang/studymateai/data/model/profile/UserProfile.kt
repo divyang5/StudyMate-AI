@@ -8,6 +8,8 @@ data class UserProfile(
     val lastName: String = "",
     val email: String = "",
     val createdAt: Timestamp? = null,
+    val termsAcceptedVersion: Int = 0,
+    val termsAcceptedAt: Timestamp? = null,
     val isUserLoading: Boolean = true,
     val error: String? = null
 

@@ -2,8 +2,10 @@ package com.divyang.studymateai.data.repository.impl
 
 import com.divyang.studymateai.data.model.profile.UserProfile
 import com.divyang.studymateai.data.repository.UserRepository
+import com.divyang.studymateai.legal.TermsPolicy
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
@@ -25,14 +27,29 @@ class UserRepositoryImpl @Inject constructor(
         lastName: String,
         email: String
     ) = runFirestore {
+        // Sign-up requires the terms checkbox, so profile creation doubles as
+        // the acceptance record for new accounts.
         users.document(uid).set(
             hashMapOf(
                 "uid" to uid,
                 "firstName" to firstName,
                 "lastName" to lastName,
                 "email" to email,
-                "createdAt" to FieldValue.serverTimestamp()
+                "createdAt" to FieldValue.serverTimestamp(),
+                "termsAcceptedVersion" to TermsPolicy.VERSION,
+                "termsAcceptedAt" to FieldValue.serverTimestamp()
             )
+        ).await()
+        Unit
+    }
+
+    override suspend fun recordTermsAcceptance(uid: String) = runFirestore {
+        users.document(uid).set(
+            mapOf(
+                "termsAcceptedVersion" to TermsPolicy.VERSION,
+                "termsAcceptedAt" to FieldValue.serverTimestamp()
+            ),
+            SetOptions.merge()
         ).await()
         Unit
     }

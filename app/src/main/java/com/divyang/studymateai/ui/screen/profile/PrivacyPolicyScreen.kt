@@ -16,7 +16,7 @@ import com.divyang.studymateai.ui.components.AppTopBar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrivacyPolicyScreen(navController: NavController) {
-    val privacyPolicyUrl = "https://studymateai-privacy-bc8465.netlify.app/"
+    val privacyPolicyUrl = "https://studymateai-privacy.netlify.app/"
 
     Scaffold(
         topBar = { AppTopBar(title = "Privacy Policy", onBack = { navController.popBackStack() }) },
