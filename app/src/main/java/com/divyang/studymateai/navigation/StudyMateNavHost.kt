@@ -35,7 +35,6 @@ import com.divyang.studymateai.utils.AuthEvent
 import com.divyang.studymateai.utils.AuthEventBus
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-import java.net.URLDecoder
 
 @Composable
 fun StudyMateNavHost(
@@ -103,8 +102,8 @@ fun StudyMateNavHost(
         }
 
 
-        composable(Routes.Home.route) {
-            HomeScreen(navController)
+        composable(Routes.Home.route) { entry ->
+            HomeScreen(navController, savedStateHandle = entry.savedStateHandle)
         }
 
         composable(Routes.Library.route) {
@@ -130,28 +129,25 @@ fun StudyMateNavHost(
 
 
         composable(
-            route = Routes.Scan.route + "?${Routes.Scan.ARG_FROM_CAMERA}={${Routes.Scan.ARG_FROM_CAMERA}}&${Routes.Scan.ARG_EXISTING_TEXT}={${Routes.Scan.ARG_EXISTING_TEXT}}",
+            route = Routes.Scan.fullRoute,
             arguments = listOf(
                 navArgument(Routes.Scan.ARG_FROM_CAMERA) {
                     type = NavType.BoolType
                     defaultValue = false
                 },
-                navArgument(Routes.Scan.ARG_EXISTING_TEXT) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
+                navArgument(Routes.Scan.ARG_RETURN_RESULT) {
+                    type = NavType.BoolType
+                    defaultValue = false
                 }
             )
         ) { backStackEntry ->
-            val existingTextEncoded =
-                backStackEntry.arguments?.getString(Routes.Scan.ARG_EXISTING_TEXT)
-            val existingText = existingTextEncoded?.let { URLDecoder.decode(it, "UTF-8") }
             val fromCamera = backStackEntry.arguments?.getBoolean(Routes.Scan.ARG_FROM_CAMERA) ?: false
+            val returnResult = backStackEntry.arguments?.getBoolean(Routes.Scan.ARG_RETURN_RESULT) ?: false
 
             ScanScreen(
                 navController = navController,
-                initialText = existingText,
-                fromCamera = fromCamera
+                fromCamera = fromCamera,
+                returnResult = returnResult
             )
         }
 
@@ -165,44 +161,19 @@ fun StudyMateNavHost(
         composable(
             route = Routes.TextEdit.route,
             arguments = listOf(
-                navArgument("title") { defaultValue = "" },
-                navArgument("description") { defaultValue = "" },
-                navArgument("content") { defaultValue = "" },
+                navArgument(Routes.TextEdit.ARG_CHAPTER_ID) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
             )
         ) { backStackEntry ->
-            val title = backStackEntry.arguments?.getString("title") ?: ""
-            val description = backStackEntry.arguments?.getString("description") ?: ""
-            val content = backStackEntry.arguments?.getString("content") ?: ""
-            val extractedText = try {
-                URLDecoder.decode(content, "UTF-8")
-            } catch (e: Exception) {
-                ""
-            }
             TextEditorScreen(
-                title = URLDecoder.decode(title, "UTF-8"),
-                description = URLDecoder.decode(description, "UTF-8"),
-                extractedText = URLDecoder.decode(content, "UTF-8"),
-                navController = navController
+                chapterId = backStackEntry.arguments?.getString(Routes.TextEdit.ARG_CHAPTER_ID),
+                navController = navController,
+                savedStateHandle = backStackEntry.savedStateHandle
             )
         }
-
-        composable(
-         route = Routes.TextEdit.route,
-         arguments = listOf(
-             navArgument("title")       { defaultValue = "" },
-             navArgument("description") { defaultValue = "" },
-             navArgument("content")     { defaultValue = "" },
-             navArgument("chapterId")   { nullable = true; defaultValue = null },
-         )) { backStackEntry ->
-                 val args = backStackEntry.arguments
-                 TextEditorScreen(
-                     title = URLDecoder.decode(args?.getString("title") ?: "", "UTF-8"),
-                     description = URLDecoder.decode(args?.getString("description") ?: "", "UTF-8"),
-                     extractedText = URLDecoder.decode(args?.getString("content") ?: "", "UTF-8"),
-                     chapterId = args?.getString("chapterId"),   // null when creating new
-                     navController = navController
-                 )
-             }
 
 
         composable(
@@ -214,7 +185,7 @@ fun StudyMateNavHost(
             )
         ) { backStackEntry ->
             val chapterId = backStackEntry.arguments?.getString(Routes.ChapterDetail.CHAPTER_ID) ?: ""
-            ChapterDetailScreen(navController, chapterId)
+            ChapterDetailScreen(navController, chapterId, savedStateHandle = backStackEntry.savedStateHandle)
         }
 
 

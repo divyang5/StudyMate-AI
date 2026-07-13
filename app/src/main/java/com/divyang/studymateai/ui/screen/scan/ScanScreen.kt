@@ -5,12 +5,12 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.BackHandler
@@ -29,12 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,17 +39,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import com.divyang.studymateai.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,7 +51,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -72,52 +59,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.divyang.studymateai.R
+import com.divyang.studymateai.navigation.Routes
 import com.divyang.studymateai.ui.components.PermissionDialog
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
-import com.google.firebase.Firebase
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.firestore
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 
 
-enum class ScreenState { SCAN_SELECTION, SCANNING, EDITING }
+enum class ScreenState { SCAN_SELECTION, SCANNING }
 
+/**
+ * Source picker + text extraction only. Editing always happens in the shared
+ * block editor (TextEditorScreen): after extraction this screen navigates
+ * there (or pops back with a result in [returnResult] mode), handing the text
+ * over via SavedStateHandle — never through a nav route, where newlines break
+ * route matching.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun ScanScreen(
     navController: NavController,
-    initialText: String? = null,
     fromCamera: Boolean = false,
+    returnResult: Boolean = false,
     context: Context = LocalContext.current
 ) {
     val scope = rememberCoroutineScope()
     val currentScreenState = remember {
         mutableStateOf(
-            when {
-                !initialText.isNullOrEmpty() -> ScreenState.EDITING
-                fromCamera -> ScreenState.SCANNING   // "Take Photo" opens the camera directly
-                else -> ScreenState.SCAN_SELECTION
-            }
+            if (fromCamera) ScreenState.SCANNING   // "Take Photo" opens the camera directly
+            else ScreenState.SCAN_SELECTION
         )
     }
-    val showDiscardDialog  = remember { mutableStateOf(false) }
-    val extractedText      = remember { mutableStateOf(initialText ?: "") }
-    val titleState         = remember { mutableStateOf("") }
-    val descriptionState   = remember { mutableStateOf("") }
     val isLoading          = remember { mutableStateOf(false) }
+    // (current page, page count) while a multi-page PDF is being OCR'd
+    val importProgress     = remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val showError          = remember { mutableStateOf(false) }
     val errorMessage       = remember { mutableStateOf<String?>(null) }
-    val showSuccess        = remember { mutableStateOf(false) }
 
 
     // Permission tracking states
@@ -135,24 +121,44 @@ fun ScanScreen(
         else Manifest.permission.READ_EXTERNAL_STORAGE
     )
 
-    // Gallery launcher
+    val onTextReady: (String) -> Unit = { text ->
+        if (returnResult) {
+            // "Scan More": hand the text back to the editor already on the stack.
+            navController.previousBackStackEntry
+                ?.savedStateHandle?.set(Routes.KEY_SCANNED_TEXT, text)
+            navController.popBackStack()
+        } else {
+            // Import flow: replace this screen with the editor and hand the
+            // text to it the same way.
+            navController.navigate(Routes.TextEdit.createRoute()) {
+                popUpTo(Routes.Scan.fullRoute) { inclusive = true }
+            }
+            navController.currentBackStackEntry
+                ?.savedStateHandle?.set(Routes.KEY_SCANNED_TEXT, text)
+        }
+    }
+
+    // Gallery launcher — decode + OCR run off the main thread (a full-size
+    // photo decode on Main froze the UI for the whole extraction).
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
             isLoading.value = true
-            processUriForText(context, it,
-                onTextExtracted = { text ->
-                    extractedText.value = appendText(extractedText.value, text)
-                    isLoading.value = false
-                    currentScreenState.value = ScreenState.EDITING
-                },
-                onError = {
-                    isLoading.value = false
+            scope.launch {
+                try {
+                    val text = withContext(Dispatchers.Default) {
+                        extractTextFromImageUri(context, it)
+                    }
+                    onTextReady(text)
+                } catch (e: Exception) {
+                    Log.e("ScanScreen", "Image processing failed", e)
                     errorMessage.value = "Failed to process image"
                     showError.value = true
+                } finally {
+                    isLoading.value = false
                 }
-            )
+            }
         }
     }
 
@@ -163,17 +169,26 @@ fun ScanScreen(
         uri?.let {
             isLoading.value = true
             scope.launch {
-                val text = withContext(Dispatchers.IO) {
-                    extractTextFromDocument(context, it)
-                }
-                if (text != null) {
-                    extractedText.value = appendText(extractedText.value, text)
-                    currentScreenState.value = ScreenState.EDITING
-                } else {
-                    errorMessage.value = "Could not read this file type"
+                try {
+                    val text = withContext(Dispatchers.IO) {
+                        extractTextFromDocument(context, it) { page, total ->
+                            importProgress.value = page to total
+                        }
+                    }
+                    if (text != null) {
+                        onTextReady(text)
+                    } else {
+                        errorMessage.value = "Could not read this file type"
+                        showError.value = true
+                    }
+                } catch (e: Exception) {
+                    Log.e("ScanScreen", "Document extraction failed", e)
+                    errorMessage.value = "Failed to read this file"
                     showError.value = true
+                } finally {
+                    isLoading.value = false
+                    importProgress.value = null
                 }
-                isLoading.value = false
             }
         }
     }
@@ -181,10 +196,7 @@ fun ScanScreen(
     BackHandler {
         when (currentScreenState.value) {
             ScreenState.SCAN_SELECTION -> navController.popBackStack()
-            ScreenState.SCANNING -> currentScreenState.value =
-                if (extractedText.value.isNotEmpty()) ScreenState.EDITING else ScreenState.SCAN_SELECTION
-            ScreenState.EDITING -> if (extractedText.value.isNotEmpty()) showDiscardDialog.value = true
-            else navController.popBackStack()
+            ScreenState.SCANNING -> currentScreenState.value = ScreenState.SCAN_SELECTION
         }
     }
 
@@ -199,17 +211,11 @@ fun ScanScreen(
                 title = when (currentScreenState.value) {
                     ScreenState.SCAN_SELECTION -> "Add Chapter"
                     ScreenState.SCANNING -> "Scan Document"
-                    ScreenState.EDITING -> "Edit Document"
                 },
                 onBack = {
                     when (currentScreenState.value) {
                         ScreenState.SCAN_SELECTION -> navController.popBackStack()
-                        ScreenState.SCANNING -> currentScreenState.value =
-                            if (extractedText.value.isNotEmpty()) ScreenState.EDITING
-                            else ScreenState.SCAN_SELECTION
-                        ScreenState.EDITING -> if (extractedText.value.isNotEmpty())
-                            showDiscardDialog.value = true
-                        else navController.popBackStack()
+                        ScreenState.SCANNING -> currentScreenState.value = ScreenState.SCAN_SELECTION
                     }
                 }
             )
@@ -311,7 +317,7 @@ fun ScanScreen(
                                 )
                                 ScanDivider()
                                 SourceRow(
-                                    iconRes  = R.drawable.ic_pdf,       // add a pdf drawable
+                                    iconRes  = R.drawable.ic_pdf,
                                     iconBg   = Color(0xFFFAEEDA),
                                     iconTint = Color(0xFF854F0B),
                                     title    = "Import PDF",
@@ -320,7 +326,7 @@ fun ScanScreen(
                                 )
                                 ScanDivider()
                                 SourceRow(
-                                    iconRes  = R.drawable.ic_document,  // add a doc drawable
+                                    iconRes  = R.drawable.ic_document,
                                     iconBg   = Color(0xFFFAECE7),
                                     iconTint = Color(0xFF993C1D),
                                     title    = "Import Document",
@@ -338,10 +344,7 @@ fun ScanScreen(
                 // ── Camera ────────────────────────────────────────────────
                 ScreenState.SCANNING -> {
                     CameraScanner(
-                        onTextDetected = { newText ->
-                            extractedText.value = appendText(extractedText.value, newText)
-                            currentScreenState.value = ScreenState.EDITING
-                        },
+                        onTextDetected = onTextReady,
                         onError = { e ->
                             errorMessage.value = e.message ?: "Text recognition failed"
                             showError.value = true
@@ -349,138 +352,25 @@ fun ScanScreen(
                         }
                     )
                 }
-
-                // ── Editing ───────────────────────────────────────────────
-                ScreenState.EDITING -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Spacer(Modifier.height(8.dp))
-
-                        ScanSectionLabel("Content")
-//                        OutlinedTextField(
-//                            value = extractedText.value,
-//                            onValueChange = { extractedText.value = it },
-//                            modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 320.dp),
-//                            placeholder = { Text("Document text...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
-//                            isError = showError.value && extractedText.value.isEmpty(),
-//                            shape = RoundedCornerShape(14.dp),
-//                            maxLines = 20,
-//                            colors = scanFieldColors()
-//                        )
-
-                        OutlinedTextField(
-                            value = extractedText.value,
-                            onValueChange = { extractedText.value = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),          // <- takes remaining space, scrolls internally, no outer scroll fighting it
-                            placeholder = { Text("Document text...") },
-                            isError = showError.value && extractedText.value.isEmpty(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = scanFieldColors()
-                        )
-
-                        Spacer(Modifier.height(4.dp))
-                        ScanSectionLabel("Title")
-                        OutlinedTextField(
-                            value = titleState.value,
-                            onValueChange = { titleState.value = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("Chapter title", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
-                            isError = showError.value && titleState.value.isEmpty(),
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = scanFieldColors()
-                        )
-
-                        Spacer(Modifier.height(4.dp))
-                        ScanSectionLabel("Description")
-                        OutlinedTextField(
-                            value = descriptionState.value,
-                            onValueChange = { descriptionState.value = it },
-                            modifier = Modifier.fillMaxWidth().height(120.dp),
-                            placeholder = { Text("Short description", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
-                            isError = showError.value && descriptionState.value.isEmpty(),
-                            shape = RoundedCornerShape(14.dp),
-                            maxLines = 5,
-                            colors = scanFieldColors()
-                        )
-
-                        Spacer(Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { currentScreenState.value = ScreenState.SCAN_SELECTION },
-                                shape  = RoundedCornerShape(14.dp),
-                                border = BorderStroke(0.5.dp, Color(0xFF534AB7)),
-                                modifier = Modifier.weight(1f).height(52.dp)
-                            ) {
-                                Text("Scan More", color = Color(0xFF534AB7))
-                            }
-                            Button(
-                                onClick = {
-                                    if (titleState.value.isEmpty() || descriptionState.value.isEmpty() || extractedText.value.isEmpty()) {
-                                        showError.value = true
-                                    } else {
-                                        isLoading.value = true
-                                        saveToFirestore(
-                                            title         = titleState.value,
-                                            description   = descriptionState.value,
-                                            extractedText = extractedText.value,
-                                            onSuccess     = { isLoading.value = false; showSuccess.value = true },
-                                            onError       = { isLoading.value = false; errorMessage.value = "Failed to save"; showError.value = true }
-                                        )
-                                    }
-                                },
-                                shape  = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF534AB7),
-                                    contentColor   = Color.White
-                                ),
-                                modifier  = Modifier.weight(1f).height(52.dp),
-                                enabled   = !isLoading.value,
-                                elevation = ButtonDefaults.buttonElevation(0.dp)
-                            ) {
-                                if (isLoading.value) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
-                                } else {
-                                    Text("Save", fontWeight = FontWeight.Medium)
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                    }
-                }
             }
 
             // Global loading overlay
             if (isLoading.value) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0xFF534AB7))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = Color(0xFF534AB7))
+                        importProgress.value?.let { (page, total) ->
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = "Scanning page $page of $total",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
                 }
             }
         }
-    }
-
-    // Discard dialog
-    if (showDiscardDialog.value) {
-        StyledDialog(
-            title = "Discard Changes?",
-            body  = "Your scanned text will be lost if you go back.",
-            confirmText  = "Discard",
-            confirmColor = Color(0xFFA32D2D),
-            confirmBg    = Color(0xFFFCEBEB),
-            onConfirm    = { showDiscardDialog.value = false; navController.popBackStack() },
-            onDismiss    = { showDiscardDialog.value = false }
-        )
     }
 
     // Error dialog
@@ -496,18 +386,6 @@ fun ScanScreen(
         )
     }
 
-    // Success dialog
-    if (showSuccess.value) {
-        StyledDialog(
-            title = "Saved!",
-            body  = "Chapter saved successfully.",
-            confirmText  = "Continue",
-            confirmColor = Color(0xFF0F6E56),
-            confirmBg    = Color(0xFFE1F5EE),
-            onConfirm    = { showSuccess.value = false; navController.popBackStack() },
-            onDismiss    = { showSuccess.value = false }
-        )
-    }
     if (showPermissionDialog.value) {
         PermissionDialog(
             text = permissionMessage.value,
@@ -574,22 +452,6 @@ private fun ScanDivider() = HorizontalDivider(
 )
 
 @Composable
-private fun ScanSectionLabel(text: String) = Text(
-    text = text.uppercase(),
-    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.6.sp),
-    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-    modifier = Modifier.padding(start = 2.dp, bottom = 4.dp)
-)
-
-@Composable
-private fun scanFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor   = Color(0xFF534AB7),
-    unfocusedBorderColor = Color(0xFF534AB7).copy(alpha = 0.25f),
-    focusedLabelColor    = Color(0xFF534AB7),
-    cursorColor          = Color(0xFF534AB7)
-)
-
-@Composable
 private fun StyledDialog(
     title: String,
     body: String,
@@ -622,11 +484,19 @@ private fun StyledDialog(
 
 // ── Document text extraction ──────────────────────────────────────────────────
 
-fun extractTextFromDocument(context: Context, uri: Uri): String? {
+// OCR accuracy plateaus well below full sensor resolution; capping the longest
+// side keeps per-page bitmaps small enough to avoid GC churn/OOM.
+private const val MAX_OCR_DIMENSION = 2048
+
+suspend fun extractTextFromDocument(
+    context: Context,
+    uri: Uri,
+    onProgress: (page: Int, total: Int) -> Unit = { _, _ -> }
+): String? {
     val mime = context.contentResolver.getType(uri) ?: ""
     return when {
         mime == "application/pdf" || uri.toString().endsWith(".pdf") ->
-            extractTextFromPdf(context, uri)
+            extractTextFromPdf(context, uri, onProgress)
 
         mime.contains("wordprocessingml") || uri.toString().endsWith(".docx") ->
             extractTextFromDocx(context, uri)
@@ -638,26 +508,43 @@ fun extractTextFromDocument(context: Context, uri: Uri): String? {
     }
 }
 
-private fun extractTextFromPdf(context: Context, uri: Uri): String {
+private suspend fun extractTextFromPdf(
+    context: Context,
+    uri: Uri,
+    onProgress: (page: Int, total: Int) -> Unit
+): String {
     val sb = StringBuilder()
     val fd: ParcelFileDescriptor =
         context.contentResolver.openFileDescriptor(uri, "r") ?: return ""
-    PdfRenderer(fd).use { renderer ->
-        for (i in 0 until renderer.pageCount) {
-            renderer.openPage(i).use { page ->
-                // Render each page to bitmap then OCR it
-                val bmp = Bitmap.createBitmap(
-                    page.width * 2, page.height * 2, Bitmap.Config.ARGB_8888
-                )
-                page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                val image = InputImage.fromBitmap(bmp, 0)
-                val result = com.google.android.gms.tasks.Tasks.await(
-                    TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS).process(image)
-                )
-                sb.append(result.text).append("\n\n")
-                bmp.recycle()
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    try {
+        PdfRenderer(fd).use { renderer ->
+            val pageCount = renderer.pageCount
+            for (i in 0 until pageCount) {
+                onProgress(i + 1, pageCount)
+                renderer.openPage(i).use { page ->
+                    // Upscale for OCR quality, but cap the bitmap size —
+                    // an unconditional 2x on large pages allocated enormous
+                    // ARGB_8888 bitmaps.
+                    val scale = (MAX_OCR_DIMENSION.toFloat() / maxOf(page.width, page.height))
+                        .coerceAtMost(2f)
+                    val bmp = Bitmap.createBitmap(
+                        (page.width * scale).toInt().coerceAtLeast(1),
+                        (page.height * scale).toInt().coerceAtLeast(1),
+                        Bitmap.Config.ARGB_8888
+                    )
+                    // PdfRenderer leaves unpainted pixels transparent, which
+                    // OCR reads as black — start from a white page.
+                    bmp.eraseColor(android.graphics.Color.WHITE)
+                    page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    val result = recognizer.process(InputImage.fromBitmap(bmp, 0)).await()
+                    sb.append(result.text).append("\n\n")
+                    bmp.recycle()
+                }
             }
         }
+    } finally {
+        recognizer.close()
     }
     return sb.toString().trim()
 }
@@ -672,60 +559,41 @@ private fun extractTextFromDocx(context: Context, uri: Uri): String {
     return sb.toString().trim()
 }
 
-private fun appendText(existing: String, new: String): String =
-    if (existing.isNotEmpty()) "$existing\n\n$new" else new
-
-private fun saveToFirestore(
-    title: String, description: String, extractedText: String,
-    onSuccess: () -> Unit, onError: () -> Unit
-) {
-    val userId = Firebase.auth.currentUser?.uid ?: return onError()
-    Firebase.firestore.collection("chapters").add(
-        hashMapOf(
-            "title"       to title,
-            "description" to description,
-            "content"     to extractedText,
-            "createdAt"   to FieldValue.serverTimestamp(),
-            "userId"      to userId
-        )
-    ).addOnSuccessListener { onSuccess() }.addOnFailureListener { onError() }
-}
-
-private fun processUriForText(
-    context: Context,
-    uri: Uri,
-    onTextExtracted: (String) -> Unit,
-    onError: () -> Unit
-) {
-    try {
-        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
-        } else {
-            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-        }
-        processImageForText(context, bitmap, onTextExtracted, onError)
-    } catch (e: Exception) {
-        onError()
-        Log.e("ScanAndEditScreen", "Image loading failed", e)
+/** Decodes the image downsampled to [MAX_OCR_DIMENSION] and OCRs it. Throws on failure. */
+private suspend fun extractTextFromImageUri(context: Context, uri: Uri): String {
+    val bitmap = decodeDownsampledBitmap(context, uri)
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    return try {
+        recognizer.process(InputImage.fromBitmap(bitmap, 0)).await().text
+    } finally {
+        recognizer.close()
+        bitmap.recycle()
     }
 }
 
-private fun processImageForText(
-    context: Context,
-    bitmap: Bitmap,
-    onTextExtracted: (String) -> Unit,
-    onError: () -> Unit
-) {
-    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-    val inputImage = InputImage.fromBitmap(bitmap, 0)
-
-    recognizer.process(inputImage)
-        .addOnSuccessListener { visionText ->
-            onTextExtracted(visionText.text)
+private fun decodeDownsampledBitmap(context: Context, uri: Uri): Bitmap =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        ImageDecoder.decodeBitmap(
+            ImageDecoder.createSource(context.contentResolver, uri)
+        ) { decoder, info, _ ->
+            // ML Kit needs a software bitmap, and full-resolution photos are
+            // far larger than OCR benefits from.
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            val maxDim = maxOf(info.size.width, info.size.height)
+            if (maxDim > MAX_OCR_DIMENSION) {
+                decoder.setTargetSampleSize(maxDim / MAX_OCR_DIMENSION)
+            }
         }
-        .addOnFailureListener { e ->
-            onError()
-            Log.e("ScanAndEditScreen", "Text recognition failed", e)
+    } else {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, bounds)
         }
-}
-
+        val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
+        val opts = BitmapFactory.Options().apply {
+            inSampleSize = Integer.highestOneBit((maxDim / MAX_OCR_DIMENSION).coerceAtLeast(1))
+        }
+        context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, opts)
+        } ?: throw IllegalStateException("Could not decode image")
+    }

@@ -1,7 +1,5 @@
 package com.divyang.studymateai.navigation
 
-import java.net.URLEncoder
-
 sealed class Routes(val route: String) {
     object Login : Routes("login")
     object SignUp : Routes("signup")
@@ -24,34 +22,27 @@ sealed class Routes(val route: String) {
     object Scan {
         const val route = "scan"
         const val ARG_FROM_CAMERA = "fromCamera"
-        const val ARG_EXISTING_TEXT = "existingText"
 
-        // Helper function to create the route with parameters
-        fun createRoute(fromCamera: Boolean, existingText: String? = null): String {
-            return if (existingText != null) {
-                "$route?$ARG_FROM_CAMERA=$fromCamera&$ARG_EXISTING_TEXT=${URLEncoder.encode(existingText, "UTF-8")}"
-            } else {
-                "$route?$ARG_FROM_CAMERA=$fromCamera"
-            }
-        }
+        // When true, the scan flow hands the extracted text back to the
+        // previous back-stack entry (KEY_SCANNED_TEXT) instead of opening its
+        // own editor — used by the text editor's "Scan More".
+        const val ARG_RETURN_RESULT = "returnResult"
+
+        // Pattern registered in the NavHost; also what popUpTo must reference.
+        const val fullRoute =
+            "$route?$ARG_FROM_CAMERA={$ARG_FROM_CAMERA}&$ARG_RETURN_RESULT={$ARG_RETURN_RESULT}"
+
+        fun createRoute(fromCamera: Boolean, returnResult: Boolean = false): String =
+            "$route?$ARG_FROM_CAMERA=$fromCamera&$ARG_RETURN_RESULT=$returnResult"
     }
 
-//    object TextEdit : Routes("textedit/{extractedText}") {
-//        const val EXTRACTED_TEXT = "extractedText"
-//        fun createRoute(extractedText: String) = "textedit/${URLEncoder.encode(extractedText, "UTF-8")}"
-//    }
-
-    object TextEdit : Routes("textEditor?title={title}&description={description}&content={content}&chapterId={chapterId}") {
-        const val content = "content"
-        const val title = "title"
-        const val description = "description"
-        fun createRoute(title: String,
-                        description: String,
-                        content: String,
-                        chapterId: String? = null) : String {
-            val base = "textEditor?title=$title&description=$description&content=$content"
-            return if (chapterId != null) "$base&chapterId=$chapterId" else base
-        }
+    // Only the chapter id travels through the route; the editor loads the
+    // chapter itself. Chapter text in nav args crashed route matching
+    // (newlines break the arg pattern) and risks TransactionTooLargeException.
+    object TextEdit : Routes("textEditor?chapterId={chapterId}") {
+        const val ARG_CHAPTER_ID = "chapterId"
+        fun createRoute(chapterId: String? = null): String =
+            if (chapterId != null) "textEditor?$ARG_CHAPTER_ID=$chapterId" else "textEditor"
     }
 
     object ChapterView : Routes("chapter/{id}") {
@@ -86,6 +77,14 @@ sealed class Routes(val route: String) {
     }
 
     companion object {
+        // SavedStateHandle keys used to signal earlier back-stack entries to
+        // refresh, instead of recreating their ViewModels via re-navigation.
+        const val KEY_CHAPTERS_CHANGED = "chapters_changed"
+        const val KEY_CHAPTER_CHANGED = "chapter_changed"
+
+        // Scan-flow result: extracted text handed back to the text editor.
+        const val KEY_SCANNED_TEXT = "scanned_text"
+
         fun getStartDestination(isLoggedIn: Boolean): String {
             return if (isLoggedIn) Home.route else Login.route
         }

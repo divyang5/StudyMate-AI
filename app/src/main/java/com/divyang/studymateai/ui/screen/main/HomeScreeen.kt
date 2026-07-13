@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.divyang.studymateai.R
@@ -45,6 +46,7 @@ import com.divyang.studymateai.ui.components.GlassActionTile
 import com.divyang.studymateai.ui.components.GradientHero
 import com.divyang.studymateai.ui.components.HeroStatPill
 import com.divyang.studymateai.ui.components.SectionHeading
+import com.divyang.studymateai.ui.components.verticalScrollbar
 import java.util.Calendar
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ import java.util.Calendar
 @Composable
 fun HomeScreen(
     navController: NavController,
+    savedStateHandle: SavedStateHandle? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -63,6 +66,17 @@ fun HomeScreen(
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearError()
+        }
+    }
+
+    // Import/edit flows set this flag instead of re-navigating to Home, so
+    // only the chapter list refetches (not the whole screen + user profile).
+    LaunchedEffect(savedStateHandle) {
+        savedStateHandle?.getStateFlow(Routes.KEY_CHAPTERS_CHANGED, false)?.collect { changed ->
+            if (changed) {
+                savedStateHandle[Routes.KEY_CHAPTERS_CHANGED] = false
+                viewModel.refreshChapters()
+            }
         }
     }
 
@@ -118,8 +132,10 @@ private fun HomeContent(
         "$part, ${uiState.displayName} 👋"
     }
 
+    val listState = rememberLazyListState()
     LazyColumn(
-        state = rememberLazyListState(),
+        state = listState,
+        modifier = Modifier.verticalScrollbar(listState),
         contentPadding = PaddingValues(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
@@ -160,7 +176,7 @@ private fun HomeContent(
                         iconRes = R.drawable.ic_document,
                         label = "Write",
                         subtitle = "Type it out",
-                        onClick = { navController.navigate(Routes.TextEdit.createRoute("", "", "")) },
+                        onClick = { navController.navigate(Routes.TextEdit.createRoute()) },
                         modifier = Modifier.weight(1f)
                     )
                 }
