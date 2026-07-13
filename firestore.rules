@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// StudyMate AI — Firestore security rules.
+// Every document is scoped to its owner via a `userId` field (or, for the
+// users collection, the document id == uid). Deploy with:
+//   firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // User profile documents are keyed by the Firebase uid.
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Chapters carry a `userId` field identifying the owner.
+    match /chapters/{chapterId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    // Quiz history carries a `userId` field identifying the owner.
+    match /quizHistory/{docId} {
+      allow read, delete: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      // History is written once and not edited by the client.
+      allow update: if false;
+    }
+
+    // Reserved for future per-user flashcard persistence.
+    match /flashcards/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    // Deny everything not explicitly matched above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

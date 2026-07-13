@@ -2,14 +2,31 @@ package com.divyang.studymateai.shredPrefs
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.preference.PreferenceManager
 import androidx.core.content.edit
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 
 class SharedPref(context: Context?) {
 
-    private val pref: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
+    // Session data (uid, email, name) is user PII, so it is stored in an
+    // AES-256 EncryptedSharedPreferences file rather than plaintext prefs.
+    private val pref: SharedPreferences = run {
+        val appContext = requireNotNull(context) {
+            "SharedPref requires a non-null Context"
+        }.applicationContext
+        val masterKey = MasterKey.Builder(appContext)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            appContext,
+            "studymate_session",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
 
     fun saveUserSession(uid: String
                         , firstName: String, lastName: String, email: String

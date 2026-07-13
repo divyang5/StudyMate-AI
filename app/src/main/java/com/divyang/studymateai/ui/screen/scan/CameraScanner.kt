@@ -152,11 +152,12 @@ private fun captureAndProcessImage(
 
     isProcessing.value = true
 
-    // Create temporary file
+    // Create temporary file in app-internal cache (not world-accessible external
+    // storage). The captured image is deleted right after OCR completes.
     val outputFile = File.createTempFile(
         "IMG_${System.currentTimeMillis()}",
         ".jpg",
-        context.externalCacheDir
+        context.cacheDir
     )
 
     val outputOptions = ImageCapture.OutputFileOptions.Builder(outputFile).build()

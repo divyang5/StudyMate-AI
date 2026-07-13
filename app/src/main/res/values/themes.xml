@@ -2,4 +2,12 @@
 <resources>
 
     <style name="Theme.StudyMateAI" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Shown while the app process starts; core-splashscreen backports the
+         Android 12 system splash to older API levels so every device behaves the same. -->
+    <style name="Theme.StudyMateAI.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.StudyMateAI</item>
+    </style>
 </resources>

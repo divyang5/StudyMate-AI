@@ -57,14 +57,19 @@ fun LoginScreen(
         if (uiState.loginSuccess) {
             val sharedPref = SharedPref(context)
             val firebaseUser = com.google.firebase.ktx.Firebase.auth.currentUser
+            val uid = firebaseUser?.uid
 
-            val displayName = firebaseUser?.displayName.orEmpty()
+            // Only mark the session logged-in with a real uid. If the live user
+            // is somehow null here, don't persist a blank-uid "logged in" state.
+            if (uid.isNullOrBlank()) return@LaunchedEffect
+
+            val displayName = firebaseUser.displayName.orEmpty()
             val parts = displayName.trim().split(" ")
             val firstName = parts.getOrNull(0).orEmpty()
             val lastName = parts.drop(1).joinToString(" ")
-            val email = firebaseUser?.email.orEmpty()
+            val email = firebaseUser.email.orEmpty()
 
-            sharedPref.saveUserSession(firebaseUser?.uid ?: "", firstName, lastName, email)
+            sharedPref.saveUserSession(uid, firstName, lastName, email)
 
             onLoginSuccess()
         }

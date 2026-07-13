@@ -19,3 +19,24 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# --- StudyMate security/build hardening ---
+
+# Strip all Log calls from release builds so no debug/user data reaches logcat.
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+    public static int i(...);
+    public static int w(...);
+    public static int e(...);
+    public static int wtf(...);
+}
+
+# Gson deserializes these model classes reflectively; keep their fields so R8
+# obfuscation does not break JSON parsing of Gemini responses / Firestore docs.
+-keep class com.divyang.studymateai.data.model.** { *; }
+
+# Gson internals / annotations.
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn sun.misc.**

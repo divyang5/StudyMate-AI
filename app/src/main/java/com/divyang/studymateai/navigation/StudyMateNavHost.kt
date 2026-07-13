@@ -47,8 +47,14 @@ fun StudyMateNavHost(
     val sharedPref = remember { SharedPref(context) }
     val auth = remember { Firebase.auth }
 
-
-    val startDestination = Routes.getStartDestination(sharedPref.isLoggedIn())
+    // Trust the live Firebase session, not just the cached flag. A stale
+    // IS_LOGGED_IN pref with no live user (session revoked/expired) must not
+    // land the user on a protected screen — clear it and start at Login.
+    val hasLiveSession = auth.currentUser != null
+    if (sharedPref.isLoggedIn() && !hasLiveSession) {
+        sharedPref.clearUserSession()
+    }
+    val startDestination = Routes.getStartDestination(sharedPref.isLoggedIn() && hasLiveSession)
 
     LaunchedEffect(Unit) {
         AuthEventBus.events.collect { event ->

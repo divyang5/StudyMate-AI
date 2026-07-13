@@ -118,6 +118,7 @@ class ProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isDeletingAccount = true, errorMessage = null) }
+            var dataDeleted = false
             try {
                 // 1. Verify password FIRST (also refreshes the session for step 3).
                 authRepository.reauthenticate(email, password)
@@ -127,6 +128,10 @@ class ProfileViewModel @Inject constructor(
 
                 // 2. Cascade-delete all Firestore data + the user profile doc.
                 accountRepository.deleteAccountData(uid)
+
+                // Past this point the user's data is gone; if auth deletion fails
+                // we're in an orphaned-auth state and need a distinct message.
+                dataDeleted = true
 
                 // 3. Delete the Firebase Auth account (session is fresh from step 1).
                 authRepository.deleteCurrentUser()
@@ -146,11 +151,14 @@ class ProfileViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e("PROFILEVIEWMODEL", "Error deleting account", e)
+                val message = if (dataDeleted) {
+                    "Your data was removed, but the account itself could not be deleted. " +
+                        "Please sign in again and retry account deletion."
+                } else {
+                    "Failed to delete account: ${e.message}"
+                }
                 _uiState.update {
-                    it.copy(
-                        isDeletingAccount = false,
-                        errorMessage = "Failed to delete account: ${e.message}"
-                    )
+                    it.copy(isDeletingAccount = false, errorMessage = message)
                 }
             }
         }

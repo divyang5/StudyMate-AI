@@ -45,7 +45,7 @@ android {
     signingConfigs {
         create("release") {
             val keystorePath = System.getenv("KEYSTORE_PATH") ?: localProps.getProperty("KEYSTORE_PATH")
-            if (keystorePath != null) {
+            if (keystorePath != null && file(keystorePath).exists()) {
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("KEYSTORE_PASSWORD") ?: localProps.getProperty("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS") ?: localProps.getProperty("KEY_ALIAS")
@@ -62,11 +62,20 @@ android {
             buildConfigField("String", "INTERSTITIAL_AD_UNIT", "\"ca-app-pub-3940256099942544/1033173712\"")
         }
         release {
-            isMinifyEnabled = false   // you already have this
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "BANNER_AD_UNIT", "\"${localProps.getProperty("ADMOB_BANNER_ID", "")}\"")
             buildConfigField("String", "INTERSTITIAL_AD_UNIT", "\"${localProps.getProperty("ADMOB_INTERSTITIAL_ID", "")}\"")
-            signingConfig = signingConfigs.getByName("debug")
+            // Use the real release keystore when its credentials are available
+            // (env vars in CI, or local.properties locally); fall back to debug
+            // signing only when they are absent so local debug builds still work.
+            val releaseSigning = signingConfigs.getByName("release")
+            signingConfig = if (releaseSigning.storeFile != null) {
+                releaseSigning
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {
@@ -95,6 +104,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.text.google.fonts)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
@@ -120,7 +130,6 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
 
-    implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0-alpha01")
 
