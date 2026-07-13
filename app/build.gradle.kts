@@ -60,6 +60,7 @@ android {
             isDebuggable = true
             buildConfigField("String", "BANNER_AD_UNIT", "\"ca-app-pub-3940256099942544/6300978111\"")
             buildConfigField("String", "INTERSTITIAL_AD_UNIT", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("String", "REWARDED_AD_UNIT", "\"ca-app-pub-3940256099942544/5224354917\"")
         }
         release {
             isMinifyEnabled = true
@@ -67,6 +68,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "BANNER_AD_UNIT", "\"${localProps.getProperty("ADMOB_BANNER_ID", "")}\"")
             buildConfigField("String", "INTERSTITIAL_AD_UNIT", "\"${localProps.getProperty("ADMOB_INTERSTITIAL_ID", "")}\"")
+            buildConfigField("String", "REWARDED_AD_UNIT", "\"${localProps.getProperty("ADMOB_REWARDED_ID", "")}\"")
             // Use the real release keystore when its credentials are available
             // (env vars in CI, or local.properties locally); fall back to debug
             // signing only when they are absent so local debug builds still work.

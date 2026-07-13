@@ -2,6 +2,8 @@ package com.divyang.studymateai.ads
 
 import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.os.SystemClock
 import android.util.Log
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.Box
@@ -27,64 +29,137 @@ import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.gms.ads.rewarded.RewardedAd
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Inject
+import javax.inject.Singleton
 
 private const val TAG = "AdManager"
 
-class AdManager(private val context: Context) {
-    // Interstitial Ad Properties
-    private var interstitialAd: InterstitialAd? = null
+// Interstitials (not rewarded ads — those are user-initiated) share one cap so
+// two full-screen ads can never stack up within a few minutes of each other.
+private const val MIN_FULL_SCREEN_AD_INTERVAL_MS = 3 * 60_000L
 
-    // Banner Ad Properties
+/**
+ * App-wide singleton: one preloaded interstitial and one preloaded rewarded ad
+ * shared by every screen. Screen-local instances used to show nothing because
+ * each fresh instance had no ad loaded yet.
+ */
+@Singleton
+class AdManager @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    private var interstitialAd: InterstitialAd? = null
+    private var rewardedAd: RewardedAd? = null
     private var bannerAdView: AdView? = null
 
-    private var interstitialADUnit: String = BuildConfig.INTERSTITIAL_AD_UNIT
-    private var bannerADUnit: String = BuildConfig.BANNER_AD_UNIT
+    // Elapsed-realtime of the last full-screen ad (interstitial or rewarded).
+    private var lastFullScreenAdAt = 0L
 
-    init {
-        Log.d(TAG, "Initialized with bannerADUnit=$bannerADUnit, interstitialADUnit=$interstitialADUnit")
-    }
+    private val interstitialADUnit: String = BuildConfig.INTERSTITIAL_AD_UNIT
+    private val bannerADUnit: String = BuildConfig.BANNER_AD_UNIT
+    private val rewardedADUnit: String = BuildConfig.REWARDED_AD_UNIT
 
     fun loadInterstitialAd() {
-        val adRequest = AdRequest.Builder().build()
-        InterstitialAd.load(context, interstitialADUnit, adRequest, object : InterstitialAdLoadCallback() {
-            override fun onAdLoaded(ad: InterstitialAd) {
-                interstitialAd = ad
-                Log.d(TAG, "Interstitial loaded successfully with unit: $interstitialADUnit")
-            }
+        if (interstitialAd != null) return
+        InterstitialAd.load(context, interstitialADUnit, AdRequest.Builder().build(),
+            object : InterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: InterstitialAd) {
+                    interstitialAd = ad
+                    Log.d(TAG, "Interstitial loaded")
+                }
 
-            override fun onAdFailedToLoad(error: LoadAdError) {
-                interstitialAd = null
-                Log.e(TAG, "Interstitial failed to load. Code: ${error.code}, Message: ${error.message}, Domain: ${error.domain}")
-            }
-        })
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    interstitialAd = null
+                    Log.e(TAG, "Interstitial failed to load: ${error.code} ${error.message}")
+                }
+            })
     }
 
-    fun isAdLoaded(): Boolean {
-        return interstitialAd != null
+    fun loadRewardedAd() {
+        if (rewardedAd != null) return
+        RewardedAd.load(context, rewardedADUnit, AdRequest.Builder().build(),
+            object : RewardedAdLoadCallback() {
+                override fun onAdLoaded(ad: RewardedAd) {
+                    rewardedAd = ad
+                    Log.d(TAG, "Rewarded ad loaded")
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    rewardedAd = null
+                    Log.e(TAG, "Rewarded ad failed to load: ${error.code} ${error.message}")
+                }
+            })
     }
 
-    fun showInterstitialAd(onAdDismissed: () -> Unit, onAdFailed: () -> Unit) {
+    /**
+     * Shows an interstitial if one is loaded AND the frequency cap allows it;
+     * otherwise calls [onDone] immediately. The user's flow always continues.
+     */
+    fun showInterstitialAd(activity: Activity?, onDone: () -> Unit = {}) {
         val ad = interstitialAd
-        if (ad != null) {
-            ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    interstitialAd = null
-                    loadInterstitialAd()
-                    onAdDismissed()
-                }
-
-                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    Log.e(TAG, "Interstitial failed to show. Code: ${adError.code}, Message: ${adError.message}")
-                    interstitialAd = null
-                    loadInterstitialAd()
-                    onAdFailed()
-                }
-            }
-            ad.show(context as Activity)
-        } else {
-            Log.d(TAG, "Interstitial not loaded, skipping show")
-            onAdFailed()
+        val capped = SystemClock.elapsedRealtime() - lastFullScreenAdAt < MIN_FULL_SCREEN_AD_INTERVAL_MS
+        if (activity == null || ad == null || capped) {
+            if (ad == null) loadInterstitialAd()
+            if (capped) Log.d(TAG, "Interstitial skipped by frequency cap")
+            onDone()
+            return
         }
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+                interstitialAd = null
+                loadInterstitialAd()
+                onDone()
+            }
+
+            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                Log.e(TAG, "Interstitial failed to show: ${adError.code} ${adError.message}")
+                interstitialAd = null
+                loadInterstitialAd()
+                onDone()
+            }
+        }
+        lastFullScreenAdAt = SystemClock.elapsedRealtime()
+        interstitialAd = null
+        ad.show(activity)
+    }
+
+    /**
+     * Rewarded gate for user-initiated actions (e.g. regenerate). Calls
+     * [onProceed] with true when the user earned the reward — or when no ad is
+     * available, so the feature is never blocked by missing ad fill. False
+     * only when the user closed the ad early.
+     */
+    fun showRewardedAd(activity: Activity?, onProceed: (Boolean) -> Unit) {
+        val ad = rewardedAd
+        if (activity == null || ad == null) {
+            loadRewardedAd()
+            onProceed(true)
+            return
+        }
+        var earned = false
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+                rewardedAd = null
+                loadRewardedAd()
+                onProceed(earned)
+            }
+
+            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                Log.e(TAG, "Rewarded ad failed to show: ${adError.code} ${adError.message}")
+                rewardedAd = null
+                loadRewardedAd()
+                onProceed(true)
+            }
+        }
+        lastFullScreenAdAt = SystemClock.elapsedRealtime()
+        rewardedAd = null
+        ad.show(activity) { earned = true }
     }
 
     // Banner Ad Methods
@@ -97,32 +172,17 @@ class AdManager(private val context: Context) {
         var adView by remember { mutableStateOf<AdView?>(null) }
 
         DisposableEffect(Unit) {
-            Log.d(TAG, "Creating banner AdView with unit: $bannerADUnit")
-
             val newAdView = AdView(context).apply {
                 setAdSize(AdSize.BANNER)
                 this.adUnitId = bannerADUnit
                 adListener = object : AdListener() {
                     override fun onAdLoaded() {
-                        Log.d(TAG, "Banner loaded successfully with unit: $bannerADUnit")
                         loadError = false
                     }
 
                     override fun onAdFailedToLoad(adError: LoadAdError) {
-                        Log.e(TAG, "Banner failed to load. Code: ${adError.code}, Message: ${adError.message}, Domain: ${adError.domain}")
+                        Log.e(TAG, "Banner failed to load: ${adError.code} ${adError.message}")
                         loadError = true
-                    }
-
-                    override fun onAdOpened() {
-                        Log.d(TAG, "Banner ad opened")
-                    }
-
-                    override fun onAdClicked() {
-                        Log.d(TAG, "Banner ad clicked")
-                    }
-
-                    override fun onAdImpression() {
-                        Log.d(TAG, "Banner ad impression recorded")
                     }
                 }
                 loadAd(AdRequest.Builder().build())
@@ -131,7 +191,6 @@ class AdManager(private val context: Context) {
             bannerAdView = newAdView
 
             onDispose {
-                Log.d(TAG, "Disposing banner AdView")
                 newAdView.destroy()
                 bannerAdView = null
             }
@@ -154,7 +213,33 @@ class AdManager(private val context: Context) {
     // Clean up all ads
     fun destroyAllAds() {
         interstitialAd = null
+        rewardedAd = null
         bannerAdView?.destroy()
         bannerAdView = null
     }
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface AdManagerEntryPoint {
+    fun adManager(): AdManager
+}
+
+/** Returns the app-wide [AdManager] singleton from composables. */
+@Composable
+fun rememberAdManager(): AdManager {
+    val appContext = LocalContext.current.applicationContext
+    return remember {
+        EntryPointAccessors.fromApplication(appContext, AdManagerEntryPoint::class.java).adManager()
+    }
+}
+
+/** Unwraps the Activity backing a composable's context (needed to show full-screen ads). */
+fun Context.findActivity(): Activity? {
+    var ctx = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
 }

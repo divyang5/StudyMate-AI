@@ -34,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.divyang.studymateai.ads.findActivity
+import com.divyang.studymateai.ads.rememberAdManager
 import com.divyang.studymateai.gemini.GeminiClient
 import com.divyang.studymateai.ui.components.AppColors
 import com.divyang.studymateai.ui.components.AppErrorCard
@@ -61,6 +63,13 @@ fun SummaryScreen(
     val coroutineScope = rememberCoroutineScope()
 
     val showRegenerateConfirm = remember { mutableStateOf(false) }
+
+    val adManager = rememberAdManager()
+    val activity = remember { navController.context.findActivity() }
+
+    LaunchedEffect(Unit) {
+        adManager.loadRewardedAd()   // gates regeneration
+    }
 
     LaunchedEffect(chapterId) {
         try {
@@ -195,17 +204,20 @@ fun SummaryScreen(
             if (showRegenerateConfirm.value) {
                 ConfirmationDialog(
                     title = "Regenerate Summary?",
-                    message = "This will replace your current summary. This can't be undone.",
+                    message = "This will replace your current summary. Watch a short ad to generate a new one.",
                     confirmText = "Regenerate",
                     onConfirm = {
                         showRegenerateConfirm.value = false
-                        coroutineScope.launch {
-                            generateSummary(
-                                content = chapterContent.value,
-                                summaryState = summary,
-                                errorState = errorState,
-                                isLoading = isGeneratingSummary
-                            )
+                        adManager.showRewardedAd(activity) { proceed ->
+                            if (!proceed) return@showRewardedAd
+                            coroutineScope.launch {
+                                generateSummary(
+                                    content = chapterContent.value,
+                                    summaryState = summary,
+                                    errorState = errorState,
+                                    isLoading = isGeneratingSummary
+                                )
+                            }
                         }
                     },
                     onDismiss = { showRegenerateConfirm.value = false }

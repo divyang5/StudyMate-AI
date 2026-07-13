@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.divyang.studymateai.R
 import com.divyang.studymateai.ads.AdManager
+import com.divyang.studymateai.ads.rememberAdManager
 import com.divyang.studymateai.data.viewmodel.HomeUiState
 import com.divyang.studymateai.data.viewmodel.HomeViewModel
 import com.divyang.studymateai.navigation.Routes
@@ -60,7 +61,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val adManager = remember { AdManager(context) }
+    val adManager = rememberAdManager()
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {

@@ -30,7 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.divyang.studymateai.ads.AdManager
+import com.divyang.studymateai.ads.findActivity
+import com.divyang.studymateai.ads.rememberAdManager
 import com.divyang.studymateai.data.model.flashCard.Flashcard
 import com.divyang.studymateai.gemini.GeminiClient
 import com.divyang.studymateai.ui.components.AppColors
@@ -64,15 +65,15 @@ fun FlashCardScreen(
     val isLoadingFlashcards = remember { mutableStateOf(false) }
     val flashcards = remember { mutableStateOf<List<Flashcard>>(emptyList()) }
     val context = LocalContext.current
-    val adManager = remember { AdManager(context) }
-
+    val adManager = rememberAdManager()
+    val activity = remember(context) { context.findActivity() }
 
     val showCountDialog = remember { mutableStateOf(true) }
     val showRegenerateConfirm = remember { mutableStateOf(false) }
     val flashcardCount = remember { mutableStateOf(12) }
 
     LaunchedEffect(Unit) {
-        adManager.loadInterstitialAd()
+        adManager.loadRewardedAd()   // gates regeneration
     }
 
     fun generateFlashcards(count: Int) {
@@ -119,17 +120,6 @@ fun FlashCardScreen(
                 Log.e("FlashcardGeneration", "Flashcard generation error", e)
             } finally {
                 isLoadingFlashcards.value = false
-                if (adManager.isAdLoaded()) {
-                    delay(1000)
-                    adManager.showInterstitialAd(
-                        onAdDismissed = {
-                            Log.d("AdsGeneration", "Ads generation from dismissed from on click")
-                        },
-                        onAdFailed = {
-                            Log.d("AdsGeneration", "Ads generation from failed  1 from on click")
-                        }
-                    )
-                }
             }
         }
     }
@@ -255,12 +245,16 @@ fun FlashCardScreen(
             if (showRegenerateConfirm.value) {
                 ConfirmationDialog(
                     title = "Regenerate Flashcards?",
-                    message = "You'll lose your current set of flashcards. This can't be undone.",
+                    message = "You'll lose your current set of flashcards. Watch a short ad to generate new ones.",
                     confirmText = "Regenerate",
                     onConfirm = {
                         showRegenerateConfirm.value = false
-                        flashcards.value = emptyList()
-                        showCountDialog.value = true
+                        adManager.showRewardedAd(activity) { proceed ->
+                            if (proceed) {
+                                flashcards.value = emptyList()
+                                showCountDialog.value = true
+                            }
+                        }
                     },
                     onDismiss = { showRegenerateConfirm.value = false }
                 )

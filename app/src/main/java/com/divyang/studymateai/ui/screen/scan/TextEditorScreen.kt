@@ -45,9 +45,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.NavController
+import com.divyang.studymateai.ads.findActivity
+import com.divyang.studymateai.ads.rememberAdManager
 import com.divyang.studymateai.data.viewmodel.TextEditorViewModel
 import com.divyang.studymateai.navigation.Routes
 import com.divyang.studymateai.ui.components.AppColors
@@ -68,8 +71,12 @@ fun TextEditorScreen(
     savedStateHandle: SavedStateHandle? = null,
     viewModel: TextEditorViewModel = hiltViewModel()
 ) {
+    val adManager = rememberAdManager()
+    val activity = LocalContext.current.let { ctx -> remember(ctx) { ctx.findActivity() } }
+
     LaunchedEffect(Unit) {
         viewModel.initFor(chapterId)
+        adManager.loadInterstitialAd()   // shown after a successful save
     }
 
     // "Scan More" (and the import flow) hand extracted text back here as a
@@ -96,7 +103,11 @@ fun TextEditorScreen(
             }
             navController.previousBackStackEntry
                 ?.savedStateHandle?.set(Routes.KEY_CHAPTER_CHANGED, true)
-            navController.popBackStack()
+            // Save-point interstitial (frequency-capped); navigate back once
+            // it's dismissed — or immediately when no ad is shown.
+            adManager.showInterstitialAd(activity) {
+                navController.popBackStack()
+            }
         }
     }
 

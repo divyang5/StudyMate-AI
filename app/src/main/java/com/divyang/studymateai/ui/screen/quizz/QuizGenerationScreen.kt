@@ -35,7 +35,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.HapticFeedbackConstantsCompat
 import androidx.navigation.NavController
-import com.divyang.studymateai.ads.AdManager
+import com.divyang.studymateai.ads.findActivity
+import com.divyang.studymateai.ads.rememberAdManager
 import com.divyang.studymateai.data.model.quizz.QuizQuestion
 import com.divyang.studymateai.gemini.GeminiClient
 import com.divyang.studymateai.navigation.Routes
@@ -83,7 +84,8 @@ fun QuizGenerationScreen(
     val pagerState = rememberPagerState()
 
     val context = LocalContext.current
-    val adManager = remember { AdManager(context) }
+    val adManager = rememberAdManager()
+    val activity = remember(context) { context.findActivity() }
 
     LaunchedEffect(chapterId) {
         try {
@@ -101,7 +103,8 @@ fun QuizGenerationScreen(
         }
     }
     LaunchedEffect(Unit) {
-        adManager.loadInterstitialAd()
+        adManager.loadInterstitialAd()   // shown when the quiz is submitted/saved
+        adManager.loadRewardedAd()       // gates regeneration
     }
 
     fun resetQuizState() {
@@ -145,17 +148,6 @@ fun QuizGenerationScreen(
                 Log.e("QuizGeneration", "Quiz generation error", e)
             } finally {
                 isLoadingQuiz.value = false
-                if (adManager.isAdLoaded()) {
-                    delay(1000)
-                    adManager.showInterstitialAd(
-                        onAdDismissed = {
-                            Log.d("AdsGeneration", "Ads generation from dismissed from on click")
-                        },
-                        onAdFailed = {
-                            Log.d("AdsGeneration", "Ads generation from failed  1 from on click")
-                        }
-                    )
-                }
             }
         }
     }
@@ -212,6 +204,9 @@ fun QuizGenerationScreen(
             score.value = calculateScore()
             showResult.value = true
             saveQuizHistory()
+            // Save-point interstitial (frequency-capped in AdManager); the
+            // results screen is already composed behind it.
+            adManager.showInterstitialAd(activity)
         }
     }
 
@@ -304,8 +299,13 @@ fun QuizGenerationScreen(
                         selectedAnswers = selectedAnswers,
                         score = score.value,
                         onRetake = {
-                            resetQuizState()
-                            showQuestionCountDialog.value = true
+                            // Retake = another Gemini generation — same rewarded gate
+                            adManager.showRewardedAd(activity) { proceed ->
+                                if (proceed) {
+                                    resetQuizState()
+                                    showQuestionCountDialog.value = true
+                                }
+                            }
                         },
                         onGoHome = {
                             resetQuizState()
@@ -436,12 +436,16 @@ fun QuizGenerationScreen(
             if (showRegenerateConfirm.value) {
                 ConfirmationDialog(
                     title = "Regenerate Quiz?",
-                    message = "You'll lose your current set of questions and any answers you've selected. This can't be undone.",
+                    message = "You'll lose your current set of questions and any answers you've selected. Watch a short ad to generate a new quiz.",
                     confirmText = "Regenerate",
                     onConfirm = {
                         showRegenerateConfirm.value = false
-                        resetQuizState()
-                        showQuestionCountDialog.value = true
+                        adManager.showRewardedAd(activity) { proceed ->
+                            if (proceed) {
+                                resetQuizState()
+                                showQuestionCountDialog.value = true
+                            }
+                        }
                     },
                     onDismiss = { showRegenerateConfirm.value = false }
                 )
