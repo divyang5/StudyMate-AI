@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.divyang.studymateai.data.repository.AuthRepository
 import com.divyang.studymateai.data.repository.ChapterRepository
+import com.divyang.studymateai.gemini.GeminiClient
 import com.divyang.studymateai.utils.TextBlocks
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ data class TextEditorUiState(
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false,
     val errorMessage: String? = null,
-    val showValidationErrors: Boolean = false
+    val showValidationErrors: Boolean = false,
+    val isGeneratingMetadata: Boolean = false
 )
 
 /**
@@ -125,6 +127,32 @@ class TextEditorViewModel @Inject constructor(
         if (contentBlocks.size == 1 && contentBlocks[0].isBlank()) contentBlocks.clear()
         contentBlocks.addAll(TextBlocks.split(text))
         editingBlockIndex = null
+        // Fresh import into an untitled chapter: suggest title/description in
+        // the background. Never fires when the user already named it.
+        if (title.isBlank() && description.isBlank()) generateMetadata()
+    }
+
+    /**
+     * Suggests a title/description from the content via Gemini, off the UI
+     * path. With [overwrite] false (auto-trigger) only blank fields are
+     * filled, so text the user typed meanwhile is never clobbered; the
+     * explicit Auto-fill button passes true. Failures are silent — the fields
+     * just stay editable.
+     */
+    fun generateMetadata(overwrite: Boolean = false) {
+        if (_uiState.value.isGeneratingMetadata) return
+        val content = TextBlocks.join(contentBlocks)
+        if (content.isBlank()) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGeneratingMetadata = true) }
+            val suggestion = GeminiClient.generateChapterMetadata(content)
+            if (suggestion != null) {
+                if (overwrite || title.isBlank()) title = suggestion.title
+                if (overwrite || description.isBlank()) description = suggestion.description
+            }
+            _uiState.update { it.copy(isGeneratingMetadata = false) }
+        }
     }
 
     fun clearError() = _uiState.update { it.copy(errorMessage = null) }

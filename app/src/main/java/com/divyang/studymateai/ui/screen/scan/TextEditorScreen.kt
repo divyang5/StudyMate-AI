@@ -206,7 +206,43 @@ private fun EditorContent(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item(key = "title") {
-            EditorSectionLabel("Title")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                EditorSectionLabel("Title")
+                if (uiState.isGeneratingMetadata) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(12.dp),
+                            strokeWidth = 1.5.dp,
+                            color = AppColors.Purple
+                        )
+                        Text(
+                            text = "Suggesting…",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AppColors.Purple.copy(alpha = 0.8f)
+                        )
+                    }
+                } else {
+                    TextButton(
+                        onClick = { viewModel.generateMetadata(overwrite = true) },
+                        enabled = !viewModel.isContentBlank
+                    ) {
+                        Text(
+                            text = "Auto-fill",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (viewModel.isContentBlank)
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            else AppColors.Purple
+                        )
+                    }
+                }
+            }
             OutlinedTextField(
                 value = viewModel.title,
                 onValueChange = viewModel::onTitleChange,
