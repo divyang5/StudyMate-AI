@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,6 +38,11 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.io.File
 
 
@@ -49,6 +55,7 @@ fun CameraScanner(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
     val textRecognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     val cameraProviderState = remember { mutableStateOf<ProcessCameraProvider?>(null) }
     val imageCapture = remember { mutableStateOf<ImageCapture?>(null) }
@@ -115,6 +122,7 @@ fun CameraScanner(
                             imageCapture = imageCapture.value,
                             context = context,
                             textRecognizer = textRecognizer,
+                            scope = scope,
                             isProcessing = isProcessing,
                             onTextDetected = onTextDetected,
                             onError = onError
@@ -137,10 +145,15 @@ fun CameraScanner(
     }
 }
 
+// OCR accuracy plateaus well below full sensor resolution; capping the longest
+// side keeps the decoded bitmap small enough to avoid GC churn/OOM.
+private const val MAX_OCR_DIMENSION = 2048
+
 private fun captureAndProcessImage(
     imageCapture: ImageCapture?,
     context: Context,
     textRecognizer: TextRecognizer,
+    scope: CoroutineScope,
     isProcessing: MutableState<Boolean>,
     onTextDetected: (String) -> Unit,
     onError: (Exception) -> Unit
@@ -167,25 +180,23 @@ private fun captureAndProcessImage(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                try {
-                    val bitmap = BitmapFactory.decodeFile(outputFile.absolutePath)
-                    val image = InputImage.fromBitmap(bitmap, 0)
-
-                    textRecognizer.process(image)
-                        .addOnSuccessListener { visionText ->
-                            onTextDetected(visionText.text)
+                // Decode + OCR off the main thread — a full-resolution camera
+                // JPEG decode on Main froze the preview.
+                scope.launch(Dispatchers.Default) {
+                    try {
+                        val bitmap = decodeDownsampledBitmap(outputFile.absolutePath)
+                        val text = textRecognizer
+                            .process(InputImage.fromBitmap(bitmap, 0)).await().text
+                        bitmap.recycle()
+                        withContext(Dispatchers.Main) { onTextDetected(text) }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            onError(Exception("Image processing failed", e))
                         }
-                        .addOnFailureListener { e ->
-                            onError(Exception("Text recognition failed", e))
-                        }
-                        .addOnCompleteListener {
-                            isProcessing.value = false
-                            outputFile.delete() // Clean up
-                        }
-                } catch (e: Exception) {
-                    isProcessing.value = false
-                    outputFile.delete()
-                    onError(Exception("Image processing failed", e))
+                    } finally {
+                        outputFile.delete()
+                        withContext(Dispatchers.Main) { isProcessing.value = false }
+                    }
                 }
             }
 
@@ -196,4 +207,15 @@ private fun captureAndProcessImage(
             }
         }
     )
+}
+
+private fun decodeDownsampledBitmap(path: String): android.graphics.Bitmap {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
+    val opts = BitmapFactory.Options().apply {
+        inSampleSize = Integer.highestOneBit((maxDim / MAX_OCR_DIMENSION).coerceAtLeast(1))
+    }
+    return BitmapFactory.decodeFile(path, opts)
+        ?: throw IllegalStateException("Could not decode captured image")
 }
