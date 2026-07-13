@@ -27,6 +27,7 @@ jobs:
         run: |
           echo "ADMOB_BANNER_ID=${{ secrets.ADMOB_BANNER_ID }}" >> local.properties
           echo "ADMOB_INTERSTITIAL_ID=${{ secrets.ADMOB_INTERSTITIAL_ID }}" >> local.properties
+          echo "ADMOB_REWARDED_ID=${{ secrets.ADMOB_REWARDED_ID }}" >> local.properties
 
       # Set up Java
       - name: Set up JDK 17
@@ -102,11 +103,15 @@ jobs:
         with:
           node-version: '20'
 
-      # Upload debug APK to Firebase App Distribution for testers
+      # Upload debug APK to Firebase App Distribution for testers.
+      # The debug build uses applicationIdSuffix ".debug", so it must be
+      # uploaded to the Firebase app registered as com.divyang.studymateai.debug
+      # (this id also lives in app/google-services.json — not a secret).
+      # Using the release app's id here fails with HTTP 400 invalid argument.
       - name: Upload to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
-          appId: ${{ secrets.FIREBASE_APP_ID }}
+          appId: "1:175485432781:android:9545f312d6976de5c48a84"
           serviceCredentialsFileContent: ${{ secrets.CREDENTIAL_FILE_CONTENT }}
           groups: testers
           file: app/build/outputs/apk/debug/app-debug.apk
