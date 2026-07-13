@@ -40,6 +40,7 @@ import com.divyang.studymateai.ui.components.AppErrorCard
 import com.divyang.studymateai.ui.components.AppTopBar
 import com.divyang.studymateai.ui.components.ConfirmationDialog
 import com.divyang.studymateai.ui.components.RefreshActionButton
+import com.divyang.studymateai.ui.components.verticalScrollbar
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.launch
@@ -225,11 +226,13 @@ fun SummaryContent(
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
         modifier = modifier
     ) {
+        val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScrollbar(scrollState)
+                .verticalScroll(scrollState)
         ) {
             Text(
                 text = "KEY SUMMARY",

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
@@ -44,6 +45,7 @@ import com.divyang.studymateai.ui.components.ChapterCard
 import com.divyang.studymateai.ui.components.DeleteConfirmDialog
 import com.divyang.studymateai.ui.components.GradientHero
 import com.divyang.studymateai.ui.components.SwipeToDeleteContainer
+import com.divyang.studymateai.ui.components.verticalScrollbar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -148,7 +150,10 @@ private fun ChapterList(
     onChapterClick: (Chapter) -> Unit,
     onDeleteRequest: (Chapter) -> Unit
 ) {
+    val listState = rememberLazyListState()
     LazyColumn(
+        state = listState,
+        modifier = Modifier.verticalScrollbar(listState),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
