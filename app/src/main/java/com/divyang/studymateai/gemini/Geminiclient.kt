@@ -3,8 +3,15 @@ package com.divyang.studymateai.gemini
 
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.InvalidAPIKeyException
 import com.google.gson.Gson
@@ -24,7 +31,7 @@ private data class ChapterMetadataDto(val title: String?, val description: Strin
 /** Thrown when a free-plan user has exhausted today's shared-key generations. */
 class GeminiQuotaExceededException : Exception(
     "You've used your ${GenerationQuota.DAILY_FREE_LIMIT} free generations for today. " +
-        "Add your own free Gemini API key in Profile → App settings → Gemini API key " +
+        "Add your own free Gemini API key in Profile → Gemini API Key " +
         "for unlimited generations, or come back tomorrow."
 )
 
@@ -168,4 +175,33 @@ fun rememberGeminiClient(): GeminiClient {
     return remember {
         EntryPointAccessors.fromApplication(appContext, GeminiClientEntryPoint::class.java).geminiClient()
     }
+}
+
+data class GeminiAccessState(val hasPersonalKey: Boolean, val remainingToday: Int)
+
+/**
+ * Personal-key + remaining-quota snapshot for UI badges. Re-read every time
+ * the host screen resumes, so it stays current after visiting the key
+ * settings screen or spending generations elsewhere.
+ */
+@Composable
+fun rememberGeminiAccessState(): GeminiAccessState {
+    val appContext = LocalContext.current.applicationContext
+    val quota = remember {
+        EntryPointAccessors.fromApplication(appContext, GeminiClientEntryPoint::class.java).generationQuota()
+    }
+    var state by remember {
+        mutableStateOf(GeminiAccessState(quota.isUnlimited(), quota.remainingToday()))
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                state = GeminiAccessState(quota.isUnlimited(), quota.remainingToday())
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    return state
 }

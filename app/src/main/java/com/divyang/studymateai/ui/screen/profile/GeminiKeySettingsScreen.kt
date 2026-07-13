@@ -159,7 +159,10 @@ fun GeminiKeySettingsScreen(
                         onValueChange = viewModel::onKeyInputChange,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
-                            Text("AIza…", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f))
+                            Text(
+                                "Paste your key (e.g. AIza… or AQ.…)",
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                            )
                         },
                         isError = uiState.errorMessage != null,
                         supportingText = uiState.errorMessage?.let { msg -> { Text(msg) } },

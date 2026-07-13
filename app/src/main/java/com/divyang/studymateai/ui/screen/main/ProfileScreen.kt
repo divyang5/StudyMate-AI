@@ -176,6 +176,16 @@ fun ProfileScreen(
                     ProfileItem(
                         iconContent = {
                             ProfileIconBox(color = Color(0xFFEEEDFE)) {
+                                Text("🔑")
+                            }
+                        },
+                        text = "Gemini API Key",
+                        onClick = { navController.navigate(Routes.GeminiKeySettings.route) }
+                    )
+                    ProfileDivider()
+                    ProfileItem(
+                        iconContent = {
+                            ProfileIconBox(color = Color(0xFFEEEDFE)) {
                                 Icon(Icons.Default.Settings, null, tint = Color(0xFF534AB7), modifier = Modifier.size(18.dp))
                             }
                         },

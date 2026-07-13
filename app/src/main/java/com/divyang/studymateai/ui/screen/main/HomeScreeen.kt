@@ -11,25 +11,35 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -38,9 +48,13 @@ import androidx.navigation.NavController
 import com.divyang.studymateai.R
 import com.divyang.studymateai.ads.AdManager
 import com.divyang.studymateai.ads.rememberAdManager
+import com.divyang.studymateai.gemini.GeminiAccessState
+import com.divyang.studymateai.gemini.GenerationQuota
+import com.divyang.studymateai.gemini.rememberGeminiAccessState
 import com.divyang.studymateai.data.viewmodel.HomeUiState
 import com.divyang.studymateai.data.viewmodel.HomeViewModel
 import com.divyang.studymateai.navigation.Routes
+import com.divyang.studymateai.ui.components.AppColors
 import com.divyang.studymateai.ui.components.BottomNavigationBar
 import com.divyang.studymateai.ui.components.ChapterCard
 import com.divyang.studymateai.ui.components.GlassActionTile
@@ -86,6 +100,23 @@ fun HomeScreen(
         onRefresh = viewModel::refresh
     )
 
+    // Once per app open: offer the personal-key form to free-plan users.
+    val geminiAccess = rememberGeminiAccessState()
+    var showKeyPrompt by remember {
+        mutableStateOf(!apiKeyPromptShownThisSession && !geminiAccess.hasPersonalKey)
+    }
+    if (showKeyPrompt) {
+        apiKeyPromptShownThisSession = true
+        ApiKeyPromptDialog(
+            remainingToday = geminiAccess.remainingToday,
+            onAddKey = {
+                showKeyPrompt = false
+                navController.navigate(Routes.GeminiKeySettings.route)
+            },
+            onDismiss = { showKeyPrompt = false }
+        )
+    }
+
     Scaffold(
         bottomBar = { BottomNavigationBar(navController) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -104,7 +135,12 @@ fun HomeScreen(
                 .padding(padding)
                 .pullRefresh(pullRefreshState)
         ) {
-            HomeContent(uiState = uiState, navController = navController, adManager = adManager)
+            HomeContent(
+                uiState = uiState,
+                geminiAccess = geminiAccess,
+                navController = navController,
+                adManager = adManager
+            )
 
             PullRefreshIndicator(
                 refreshing = uiState.isRefreshing,
@@ -120,6 +156,7 @@ fun HomeScreen(
 @Composable
 private fun HomeContent(
     uiState: HomeUiState,
+    geminiAccess: GeminiAccessState,
     navController: NavController,
     adManager: AdManager
 ) {
@@ -145,8 +182,19 @@ private fun HomeContent(
             GradientHero(
                 title = greeting,
                 subtitle = "Ready to learn something new?",
+                trailing = if (geminiAccess.hasPersonalKey) {
+                    { KeyActiveBadge() }
+                } else null,
                 stats = {
                     HeroStatPill(value = "${uiState.chapters.size}", label = "Recent chapters")
+                    if (geminiAccess.hasPersonalKey) {
+                        HeroStatPill(value = "∞", label = "AI generations")
+                    } else {
+                        HeroStatPill(
+                            value = "${geminiAccess.remainingToday}",
+                            label = "Free AI left today"
+                        )
+                    }
                 }
             )
         }
@@ -241,4 +289,65 @@ private fun HomeContent(
             }
         }
     }
+}
+
+// Shown at most once per app launch; not persisted so it reappears next open,
+// as long as the user hasn't added a personal key.
+private var apiKeyPromptShownThisSession = false
+
+@Composable
+private fun KeyActiveBadge() {
+    Surface(
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.22f)
+    ) {
+        Text(
+            text = "🔑",
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun ApiKeyPromptDialog(
+    remainingToday: Int,
+    onAddKey: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Unlock unlimited AI", fontWeight = FontWeight.SemiBold) },
+        text = {
+            Text(
+                "You're on the free plan: $remainingToday of ${GenerationQuota.DAILY_FREE_LIMIT} " +
+                    "AI generations left today (quizzes, summaries, flashcards).\n\n" +
+                    "Add your own free Gemini API key for unlimited generations — it takes " +
+                    "about a minute.\n\n" +
+                    "For your security, the key is stored only on this device. We never save " +
+                    "it in the cloud."
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onAddKey,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppColors.Purple,
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
+            ) {
+                Text("Add my API key", fontWeight = FontWeight.Medium)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    "Not now — use free plan",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        },
+        shape = RoundedCornerShape(20.dp)
+    )
 }

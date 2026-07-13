@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,24 +54,6 @@ fun AppSettingsScreen(navController: NavController) {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             item { Spacer(Modifier.height(8.dp)) }
-
-            item {
-                SettingsSectionCard(title = "AI") {
-                    SettingRow(
-                        icon = {
-                            Icon(
-                                Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        },
-                        title = "Gemini API key",
-                        subtitle = "Add your own key for unlimited generations",
-                        onClick = { navController.navigate(Routes.GeminiKeySettings.route) }
-                    )
-                }
-            }
 
             item {
                 SettingsSectionCard(title = "About") {

@@ -48,15 +48,17 @@ class GeminiKeyViewModel @Inject constructor(
 
     fun validateAndSave() {
         val key = keyInput.trim()
-        // Cheap local sanity check before spending a network call: real
-        // Gemini keys start with "AIza" and contain no whitespace.
-        val looksValid = key.startsWith("AIza") && key.length >= 30 && key.none { it.isWhitespace() }
+        // Only reject obvious garbage locally (whitespace inside, far too
+        // short) — Google issues keys with several prefixes (AIza, AQ., …),
+        // so the real judge is the live validation call below.
+        val obviouslyWrong = key.length < 20 || key.any { it.isWhitespace() }
         when {
             key.isBlank() -> setError("Paste your Gemini API key first.")
 
-            !looksValid -> setError(
-                "That doesn't look like a Gemini API key. Check the string you pasted — " +
-                    "it should start with \"AIza\" and contain no spaces or line breaks."
+            obviouslyWrong -> setError(
+                "That doesn't look like an API key. Check the string you pasted — keys " +
+                    "are usually around 39 characters (often starting with \"AIza\" or " +
+                    "\"AQ.\") with no spaces or line breaks."
             )
 
             else -> viewModelScope.launch {
