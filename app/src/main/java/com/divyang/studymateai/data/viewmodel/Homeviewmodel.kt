@@ -53,14 +53,21 @@ class HomeViewModel @Inject constructor(
         loadAll(isRefresh = true)
     }
 
+    /** Reloads only the chapter list, e.g. after an import/edit elsewhere. */
+    fun refreshChapters() {
+        viewModelScope.launch { loadChapters() }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
 
     private fun loadAll(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            loadUser()
-            loadChapters()
+            val userJob = launch { loadUser() }
+            val chaptersJob = launch { loadChapters() }
+            userJob.join()
+            chaptersJob.join()
             if (isRefresh) {
                 _uiState.update { it.copy(isRefreshing = false) }
             }

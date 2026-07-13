@@ -17,13 +17,13 @@ class ChapterRepositoryImpl @Inject constructor(
     // composite (userId + createdAt) Firestore index.
     override suspend fun getRecentChapters(userId: String, limit: Long): List<Chapter> = runFirestore {
         chapters.whereEqualTo("userId", userId).limit(limit).get().await()
-            .documents.mapNotNull { it.toChapterOrNull() }
+            .documents.mapNotNull { it.toChapterSummaryOrNull() }
             .sortedByDescending { it.createdAt }
     }
 
     override suspend fun getChapters(userId: String): List<Chapter> = runFirestore {
         chapters.whereEqualTo("userId", userId).get().await()
-            .documents.mapNotNull { it.toChapterOrNull() }
+            .documents.mapNotNull { it.toChapterSummaryOrNull() }
             .sortedByDescending { it.createdAt }
     }
 
@@ -86,6 +86,23 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toChapterOrNull(): Ch
         title = getString("title").orEmpty(),
         description = getString("description").orEmpty(),
         content = getString("content").orEmpty(),
+        createdAt = date
+    )
+}
+
+/**
+ * List variant that leaves `content` empty: list rows only render
+ * title/description/date, and materializing every chapter's full extracted
+ * text made list loads heavy. Detail screens use [ChapterRepository.getChapter]
+ * for the full document.
+ */
+private fun com.google.firebase.firestore.DocumentSnapshot.toChapterSummaryOrNull(): Chapter? {
+    val date = getDate("createdAt") ?: return null
+    return Chapter(
+        id = id,
+        title = getString("title").orEmpty(),
+        description = getString("description").orEmpty(),
+        content = "",
         createdAt = date
     )
 }

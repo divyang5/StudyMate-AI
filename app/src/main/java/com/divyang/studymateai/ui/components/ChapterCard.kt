@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -164,9 +165,14 @@ fun ChapterCard(
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                     modifier = Modifier.size(13.dp)
                 )
+                // Formatting is memoized per card — SimpleDateFormat allocation
+                // on every recomposition showed up during list scrolling.
+                val createdAtLabel = remember(chapter.createdAt) {
+                    SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
+                        .format(chapter.createdAt)
+                }
                 Text(
-                    text = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
-                        .format(chapter.createdAt),
+                    text = createdAtLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                 )
