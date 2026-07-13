@@ -86,6 +86,19 @@ fun AppSettingsScreen(navController: NavController) {
                     SettingRow(
                         icon = {
                             Icon(
+                                painter = painterResource(R.drawable.ic_document),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        },
+                        title = "Terms & Conditions",
+                        onClick = { navController.navigate(Routes.Terms.route) }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+                    SettingRow(
+                        icon = {
+                            Icon(
                                 painter = painterResource(R.drawable.language),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,

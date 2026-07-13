@@ -41,14 +41,17 @@ class SharedPref(context: Context?) {
     }
 
     fun clearUserSession() {
-        // Remove only session keys — device-level settings like the user's
-        // Gemini API key and generation quota must survive logout.
+        // Logout destroys the personal Gemini API key along with the session.
+        // The daily quota and terms acceptance survive: they are device-level,
+        // and clearing the quota would let users reset the free limit by
+        // logging out and back in.
         pref.edit {
             remove("IS_LOGGED_IN")
             remove("FIREBASE_UID")
             remove("FIRST_NAME")
             remove("LAST_NAME")
             remove("EMAIL")
+            remove(KEY_GEMINI_USER_KEY)
         }
     }
 
@@ -98,9 +101,28 @@ class SharedPref(context: Context?) {
         }
     }
 
+    // ── Terms & Conditions acceptance (device-level, survives logout) ───────
+
+    fun isTermsAccepted(): Boolean =
+        pref.getInt(KEY_TERMS_ACCEPTED_VERSION, 0) >= TERMS_VERSION
+
+    /** Records acceptance of the current terms version with a timestamp. */
+    fun setTermsAccepted() {
+        pref.edit {
+            putInt(KEY_TERMS_ACCEPTED_VERSION, TERMS_VERSION)
+            putLong(KEY_TERMS_ACCEPTED_AT, System.currentTimeMillis())
+        }
+    }
+
     private companion object {
         const val KEY_GEMINI_USER_KEY = "USER_GEMINI_API_KEY"
         const val KEY_QUOTA_DATE = "GEMINI_QUOTA_DATE"
         const val KEY_QUOTA_USED = "GEMINI_QUOTA_USED"
+
+        // Bump when the Terms & Conditions change materially — every user is
+        // asked to accept again on next launch.
+        const val TERMS_VERSION = 1
+        const val KEY_TERMS_ACCEPTED_VERSION = "TERMS_ACCEPTED_VERSION"
+        const val KEY_TERMS_ACCEPTED_AT = "TERMS_ACCEPTED_AT"
     }
 }

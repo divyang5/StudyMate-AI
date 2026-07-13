@@ -230,7 +230,8 @@ fun GeminiKeySettingsScreen(
                             "• Generation requests go directly to Google using your key, so " +
                             "usage counts against your own (free) Gemini quota\n" +
                             "• You can remove the key anytime to go back to the free plan\n" +
-                            "• If you sign out of the app, your key stays on this device",
+                            "• Signing out of the app removes the key from this device " +
+                            "for your security — re-enter it on your next login",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

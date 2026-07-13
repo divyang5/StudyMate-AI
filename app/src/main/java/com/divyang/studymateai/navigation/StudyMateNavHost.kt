@@ -27,6 +27,7 @@ import com.divyang.studymateai.ui.screen.profile.ChangePasswordScreen
 import com.divyang.studymateai.ui.screen.profile.EditProfileScreen
 import com.divyang.studymateai.ui.screen.profile.GeminiKeySettingsScreen
 import com.divyang.studymateai.ui.screen.profile.PrivacyPolicyScreen
+import com.divyang.studymateai.ui.screen.profile.TermsAndConditionsScreen
 import com.divyang.studymateai.ui.screen.quizz.QuizGenerationScreen
 import com.divyang.studymateai.ui.screen.quizz.QuizHistoryDetailScreen
 import com.divyang.studymateai.ui.screen.scan.ScanScreen
@@ -54,7 +55,10 @@ fun StudyMateNavHost(
     if (sharedPref.isLoggedIn() && !hasLiveSession) {
         sharedPref.clearUserSession()
     }
-    val startDestination = Routes.getStartDestination(sharedPref.isLoggedIn() && hasLiveSession)
+    val startDestination = Routes.getStartDestination(
+        isLoggedIn = sharedPref.isLoggedIn() && hasLiveSession,
+        termsAccepted = sharedPref.isTermsAccepted()
+    )
 
     LaunchedEffect(Unit) {
         AuthEventBus.events.collect { event ->
@@ -274,6 +278,25 @@ fun StudyMateNavHost(
 
         composable(Routes.PrivacyPolicy.route) {
             PrivacyPolicyScreen(navController)
+        }
+
+        composable(Routes.Terms.route) {
+            // Gate mode until accepted; read-only when opened from settings.
+            val requireAcceptance = !sharedPref.isTermsAccepted()
+            TermsAndConditionsScreen(
+                navController = navController,
+                requireAcceptance = requireAcceptance,
+                onAccepted = {
+                    sharedPref.setTermsAccepted()
+                    navController.navigate(
+                        Routes.getStartDestination(
+                            isLoggedIn = sharedPref.isLoggedIn() && auth.currentUser != null
+                        )
+                    ) {
+                        popUpTo(0)
+                    }
+                }
+            )
         }
 
 

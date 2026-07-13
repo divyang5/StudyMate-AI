@@ -18,6 +18,7 @@ sealed class Routes(val route: String) {
     object AppSettings : Routes("appSettings")
     object GeminiKeySettings : Routes("geminiKeySettings")
     object PrivacyPolicy : Routes("privacyPolicy")
+    object Terms : Routes("terms")
 
     // Chapter Flow
     object Scan {
@@ -86,8 +87,12 @@ sealed class Routes(val route: String) {
         // Scan-flow result: extracted text handed back to the text editor.
         const val KEY_SCANNED_TEXT = "scanned_text"
 
-        fun getStartDestination(isLoggedIn: Boolean): String {
-            return if (isLoggedIn) Home.route else Login.route
+        fun getStartDestination(isLoggedIn: Boolean, termsAccepted: Boolean = true): String {
+            return when {
+                !termsAccepted -> Terms.route
+                isLoggedIn -> Home.route
+                else -> Login.route
+            }
         }
     }
 }
