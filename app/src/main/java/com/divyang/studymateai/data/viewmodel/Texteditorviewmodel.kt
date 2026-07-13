@@ -42,7 +42,8 @@ data class TextEditorUiState(
 @HiltViewModel
 class TextEditorViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val chapterRepository: ChapterRepository
+    private val chapterRepository: ChapterRepository,
+    private val geminiClient: GeminiClient
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TextEditorUiState())
@@ -146,7 +147,7 @@ class TextEditorViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isGeneratingMetadata = true) }
-            val suggestion = GeminiClient.generateChapterMetadata(content)
+            val suggestion = geminiClient.generateChapterMetadata(content)
             if (suggestion != null) {
                 if (overwrite || title.isBlank()) title = suggestion.title
                 if (overwrite || description.isBlank()) description = suggestion.description

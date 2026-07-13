@@ -39,6 +39,8 @@ import com.divyang.studymateai.ads.findActivity
 import com.divyang.studymateai.ads.rememberAdManager
 import com.divyang.studymateai.data.model.quizz.QuizQuestion
 import com.divyang.studymateai.gemini.GeminiClient
+import com.divyang.studymateai.gemini.GeminiQuotaExceededException
+import com.divyang.studymateai.gemini.rememberGeminiClient
 import com.divyang.studymateai.navigation.Routes
 import com.divyang.studymateai.ui.components.AppErrorCard
 import com.divyang.studymateai.ui.components.AppTopBar
@@ -86,6 +88,7 @@ fun QuizGenerationScreen(
     val context = LocalContext.current
     val adManager = rememberAdManager()
     val activity = remember(context) { context.findActivity() }
+    val geminiClient = rememberGeminiClient()
 
     LaunchedEffect(chapterId) {
         try {
@@ -139,10 +142,12 @@ fun QuizGenerationScreen(
                 Return ONLY the JSON array with no additional text or markdown formatting.
             """.trimIndent()
 
-                val responseText = GeminiClient.generateContent(prompt)
+                val responseText = geminiClient.generateContent(prompt)
                 val questions = parseQuizResponse(responseText)
 
                 quizQuestions.value = questions
+            } catch (e: GeminiQuotaExceededException) {
+                errorState.value = e.message
             } catch (e: Exception) {
                 errorState.value = "Gemini couldn't generate this quiz right now. This is usually temporary — please try again."
                 Log.e("QuizGeneration", "Quiz generation error", e)

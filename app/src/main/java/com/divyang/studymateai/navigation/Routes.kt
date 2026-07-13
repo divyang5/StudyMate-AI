@@ -16,6 +16,7 @@ sealed class Routes(val route: String) {
     object ChangeEmail : Routes("changeEmail")
     object ChangePassword : Routes("changePassword")
     object AppSettings : Routes("appSettings")
+    object GeminiKeySettings : Routes("geminiKeySettings")
     object PrivacyPolicy : Routes("privacyPolicy")
 
     // Chapter Flow

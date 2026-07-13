@@ -34,6 +34,8 @@ import com.divyang.studymateai.ads.findActivity
 import com.divyang.studymateai.ads.rememberAdManager
 import com.divyang.studymateai.data.model.flashCard.Flashcard
 import com.divyang.studymateai.gemini.GeminiClient
+import com.divyang.studymateai.gemini.GeminiQuotaExceededException
+import com.divyang.studymateai.gemini.rememberGeminiClient
 import com.divyang.studymateai.ui.components.AppColors
 import com.divyang.studymateai.ui.components.AppErrorCard
 import com.divyang.studymateai.ui.components.AppTopBar
@@ -67,6 +69,7 @@ fun FlashCardScreen(
     val context = LocalContext.current
     val adManager = rememberAdManager()
     val activity = remember(context) { context.findActivity() }
+    val geminiClient = rememberGeminiClient()
 
     val showCountDialog = remember { mutableStateOf(true) }
     val showRegenerateConfirm = remember { mutableStateOf(false) }
@@ -109,12 +112,14 @@ fun FlashCardScreen(
                 Return ONLY the JSON array with no additional text or markdown formatting.
             """.trimIndent()
 
-                val responseText = GeminiClient.generateContent(prompt)
+                val responseText = geminiClient.generateContent(prompt)
 
                 val generatedFlashcards = parseFlashcardResponse(responseText)
                 Log.d("Flashcards", "Parsed ${generatedFlashcards.size} flashcards")
 
                 flashcards.value = generatedFlashcards
+            } catch (e: GeminiQuotaExceededException) {
+                errorState.value = e.message
             } catch (e: Exception) {
                 errorState.value = "Gemini couldn't generate flashcards right now. This is usually temporary — please try again."
                 Log.e("FlashcardGeneration", "Flashcard generation error", e)

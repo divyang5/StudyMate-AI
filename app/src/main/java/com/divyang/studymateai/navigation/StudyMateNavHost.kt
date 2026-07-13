@@ -25,6 +25,7 @@ import com.divyang.studymateai.ui.screen.profile.AppSettingsScreen
 import com.divyang.studymateai.ui.screen.profile.ChangeEmailScreen
 import com.divyang.studymateai.ui.screen.profile.ChangePasswordScreen
 import com.divyang.studymateai.ui.screen.profile.EditProfileScreen
+import com.divyang.studymateai.ui.screen.profile.GeminiKeySettingsScreen
 import com.divyang.studymateai.ui.screen.profile.PrivacyPolicyScreen
 import com.divyang.studymateai.ui.screen.quizz.QuizGenerationScreen
 import com.divyang.studymateai.ui.screen.quizz.QuizHistoryDetailScreen
@@ -265,6 +266,10 @@ fun StudyMateNavHost(
 
         composable(Routes.AppSettings.route) {
             AppSettingsScreen(navController)
+        }
+
+        composable(Routes.GeminiKeySettings.route) {
+            GeminiKeySettingsScreen(navController)
         }
 
         composable(Routes.PrivacyPolicy.route) {

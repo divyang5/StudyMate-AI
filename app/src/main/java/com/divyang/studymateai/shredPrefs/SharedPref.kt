@@ -41,7 +41,15 @@ class SharedPref(context: Context?) {
     }
 
     fun clearUserSession() {
-        pref.edit { clear() }
+        // Remove only session keys — device-level settings like the user's
+        // Gemini API key and generation quota must survive logout.
+        pref.edit {
+            remove("IS_LOGGED_IN")
+            remove("FIREBASE_UID")
+            remove("FIRST_NAME")
+            remove("LAST_NAME")
+            remove("EMAIL")
+        }
     }
 
     fun getFirstName(): String? = pref.getString("FIRST_NAME", null)
@@ -65,4 +73,34 @@ class SharedPref(context: Context?) {
         pref.edit { putString(key, value) }
     }
 
+    // ── User-supplied Gemini API key (encrypted at rest, never synced) ──────
+
+    fun getUserGeminiKey(): String? = pref.getString(KEY_GEMINI_USER_KEY, null)
+
+    fun setUserGeminiKey(key: String) {
+        pref.edit { putString(KEY_GEMINI_USER_KEY, key) }
+    }
+
+    fun clearUserGeminiKey() {
+        pref.edit { remove(KEY_GEMINI_USER_KEY) }
+    }
+
+    // ── Daily free-generation quota (shared app key only) ───────────────────
+
+    fun getQuotaDate(): String? = pref.getString(KEY_QUOTA_DATE, null)
+
+    fun getQuotaUsed(): Int = pref.getInt(KEY_QUOTA_USED, 0)
+
+    fun setGenerationQuota(date: String, used: Int) {
+        pref.edit {
+            putString(KEY_QUOTA_DATE, date)
+            putInt(KEY_QUOTA_USED, used)
+        }
+    }
+
+    private companion object {
+        const val KEY_GEMINI_USER_KEY = "USER_GEMINI_API_KEY"
+        const val KEY_QUOTA_DATE = "GEMINI_QUOTA_DATE"
+        const val KEY_QUOTA_USED = "GEMINI_QUOTA_USED"
+    }
 }

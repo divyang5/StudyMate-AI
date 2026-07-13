@@ -37,6 +37,8 @@ import androidx.navigation.NavController
 import com.divyang.studymateai.ads.findActivity
 import com.divyang.studymateai.ads.rememberAdManager
 import com.divyang.studymateai.gemini.GeminiClient
+import com.divyang.studymateai.gemini.GeminiQuotaExceededException
+import com.divyang.studymateai.gemini.rememberGeminiClient
 import com.divyang.studymateai.ui.components.AppColors
 import com.divyang.studymateai.ui.components.AppErrorCard
 import com.divyang.studymateai.ui.components.AppTopBar
@@ -66,6 +68,7 @@ fun SummaryScreen(
 
     val adManager = rememberAdManager()
     val activity = remember { navController.context.findActivity() }
+    val geminiClient = rememberGeminiClient()
 
     LaunchedEffect(Unit) {
         adManager.loadRewardedAd()   // gates regeneration
@@ -93,6 +96,7 @@ fun SummaryScreen(
             coroutineScope.launch {
                 generateSummary(
                     content = chapterContent.value,
+                    geminiClient = geminiClient,
                     summaryState = summary,
                     errorState = errorState,
                     isLoading = isGeneratingSummary
@@ -154,6 +158,7 @@ fun SummaryScreen(
                                 } else {
                                     generateSummary(
                                         content = chapterContent.value,
+                                        geminiClient = geminiClient,
                                         summaryState = summary,
                                         errorState = errorState,
                                         isLoading = isGeneratingSummary
@@ -178,6 +183,7 @@ fun SummaryScreen(
                                 coroutineScope.launch {
                                     generateSummary(
                                         content = chapterContent.value,
+                                        geminiClient = geminiClient,
                                         summaryState = summary,
                                         errorState = errorState,
                                         isLoading = isGeneratingSummary
@@ -213,6 +219,7 @@ fun SummaryScreen(
                             coroutineScope.launch {
                                 generateSummary(
                                     content = chapterContent.value,
+                                    geminiClient = geminiClient,
                                     summaryState = summary,
                                     errorState = errorState,
                                     isLoading = isGeneratingSummary
@@ -277,6 +284,7 @@ fun LoadingState(message: String) {
 
 private suspend fun generateSummary(
     content: String,
+    geminiClient: GeminiClient,
     summaryState: MutableState<String>,
     errorState: MutableState<String?>,
     isLoading: MutableState<Boolean>
@@ -307,8 +315,10 @@ private suspend fun generateSummary(
             - Third main idea
         """.trimIndent()
 
-        val responseText = GeminiClient.generateContent(prompt)
+        val responseText = geminiClient.generateContent(prompt)
         summaryState.value = responseText.trim().ifEmpty { "No summary generated" }
+    } catch (e: GeminiQuotaExceededException) {
+        errorState.value = e.message
     } catch (e: Exception) {
         errorState.value = "Gemini couldn't generate a summary right now. This is usually temporary — please try again."
         Log.e("SummaryScreen", "Generation error", e)
