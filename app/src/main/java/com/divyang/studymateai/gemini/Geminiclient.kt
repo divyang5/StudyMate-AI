@@ -1,6 +1,8 @@
 package com.divyang.studymateai.gemini
 
 
+import android.content.Context
+import android.os.Bundle
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -14,8 +16,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.InvalidAPIKeyException
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.gson.Gson
 import dagger.hilt.EntryPoint
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
@@ -48,6 +53,7 @@ sealed class KeyValidationResult {
  */
 @Singleton
 class GeminiClient @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val keyProvider: GeminiKeyProvider,
     private val quota: GenerationQuota
 ) {
@@ -69,9 +75,41 @@ class GeminiClient @Inject constructor(
      */
     suspend fun generateContent(prompt: String, enforceQuota: Boolean = true): String {
         if (enforceQuota && !quota.canGenerate()) throw GeminiQuotaExceededException()
-        val response = model().generateContent(prompt)
+        val response = try {
+            model().generateContent(prompt)
+        } catch (e: Exception) {
+            reportGeminiError(e)
+            throw e
+        }
         if (enforceQuota) quota.recordGeneration()
         return response.text ?: ""
+    }
+
+    /**
+     * Records a failed Gemini call to Crashlytics (non-fatal, with full stack
+     * trace) and Analytics (countable `gemini_error` event), so error volume
+     * and error kinds are visible per day in the Firebase console. Reporting
+     * must never turn a recoverable generation error into a crash.
+     */
+    private fun reportGeminiError(e: Exception) {
+        try {
+            val errorType = e.javaClass.simpleName
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("gemini_error_type", errorType)
+                setCustomKey("gemini_personal_key", quota.isUnlimited())
+                recordException(e)
+            }
+            FirebaseAnalytics.getInstance(appContext).logEvent(
+                "gemini_error",
+                Bundle().apply {
+                    putString("error_type", errorType)
+                    // Analytics param values are capped at 100 chars.
+                    putString("error_message", e.message?.take(100) ?: "unknown")
+                }
+            )
+        } catch (reportfailure: Exception) {
+            Log.e(TAG, "Failed to report Gemini error", reportfailure)
+        }
     }
 
     /**
