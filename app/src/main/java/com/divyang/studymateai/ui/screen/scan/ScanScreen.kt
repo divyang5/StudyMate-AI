@@ -108,18 +108,12 @@ fun ScanScreen(
 
     // Permission tracking states
     val hasRequestedCamera = remember { mutableStateOf(false) }
-    val hasRequestedGallery = remember { mutableStateOf(false) }
     val showPermissionDialog = remember { mutableStateOf(false) }
     val permissionMessage = remember { mutableStateOf("") }
     val permissionConfirmText = remember { mutableStateOf("Allow") }
     val onPermissionConfirm = remember { mutableStateOf<() -> Unit>({}) }
 
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
-    val galleryPermission = rememberPermissionState(
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-            Manifest.permission.READ_MEDIA_IMAGES
-        else Manifest.permission.READ_EXTERNAL_STORAGE
-    )
 
     val onTextReady: (String) -> Unit = { text ->
         if (returnResult) {
@@ -289,31 +283,7 @@ fun ScanScreen(
                                     iconTint = Color(0xFF0F6E56),
                                     title    = "Choose from Gallery",
                                     subtitle = "Pick an image file",
-                                    onClick  = {
-                                        if (galleryPermission.status.isGranted) {
-                                            galleryLauncher.launch("image/*")
-                                        } else {
-                                            if (galleryPermission.status.shouldShowRationale) {
-                                                permissionMessage.value = "StudyMate AI needs gallery access to select document images."
-                                                permissionConfirmText.value = "Allow"
-                                                onPermissionConfirm.value = { galleryPermission.launchPermissionRequest() }
-                                                showPermissionDialog.value = true
-                                            } else if (hasRequestedGallery.value) {
-                                                permissionMessage.value = "Gallery permission is permanently denied. Please enable it in App Settings to choose images."
-                                                permissionConfirmText.value = "Open Settings"
-                                                onPermissionConfirm.value = {
-                                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                                        data = Uri.fromParts("package", context.packageName, null)
-                                                    }
-                                                    context.startActivity(intent)
-                                                }
-                                                showPermissionDialog.value = true
-                                            } else {
-                                                hasRequestedGallery.value = true
-                                                galleryPermission.launchPermissionRequest()
-                                            }
-                                        }
-                                    }
+                                    onClick  = { galleryLauncher.launch("image/*") }
                                 )
                                 ScanDivider()
                                 SourceRow(
