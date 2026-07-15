@@ -24,8 +24,8 @@ android {
         applicationId = "com.divyang.studymateai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -65,6 +65,11 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Bundle native-library symbol tables (Crashlytics NDK, ML Kit,
+            // CameraX) so Play Console shows readable native crash traces.
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "BANNER_AD_UNIT", "\"${localProps.getProperty("ADMOB_BANNER_ID", "")}\"")
             buildConfigField("String", "INTERSTITIAL_AD_UNIT", "\"${localProps.getProperty("ADMOB_INTERSTITIAL_ID", "")}\"")
