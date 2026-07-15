@@ -32,18 +32,11 @@ Turn photos of textbooks, handwritten notes and PDFs into summaries, flashcards 
 
 | Home | Scan | Chapter |
 |:---:|:---:|:---:|
-| <img width="1080" height="2400" alt="shot_1_home" src="https://github.com/user-attachments/assets/18246d8d-9519-4a0c-bfa6-7f3234b32ba3" /> |
-| <img width="1080" height="2400" alt="shot_2_scan" src="https://github.com/user-attachments/assets/804f6f3d-9e91-4820-9f83-0000e8baeb23" /> | 
-| <img width="1080" height="2400" alt="shot_3_chapter" src="https://github.com/user-attachments/assets/1f31b94e-1ec2-4288-827a-6ba6fb6b975a" /> |
-
+| <img src="https://github.com/user-attachments/assets/18246d8d-9519-4a0c-bfa6-7f3234b32ba3" alt="Home" width="250"/> | <img src="https://github.com/user-attachments/assets/804f6f3d-9e91-4820-9f83-0000e8baeb23" alt="Scan" width="250"/> | <img src="https://github.com/user-attachments/assets/1f31b94e-1ec2-4288-827a-6ba6fb6b975a" alt="Chapter" width="250"/> |
 
 | Quiz | Library | Edit |
 |:---:|:---:|:---:|
-
-
-| <img width="1080" height="2400" alt="shot_4_quiz" src="https://github.com/user-attachments/assets/b540d98c-a37d-4cdb-a64c-74ba1b5fcf27" /> | 
-| <img width="1080" height="2400" alt="shot_5_library" src="https://github.com/user-attachments/assets/6f793d1c-387e-4db2-9407-6f5705392f1d" /> |
-| <img width="1080" height="2400" alt="shot_6_edit" src="https://github.com/user-attachments/assets/8e170e4b-f880-4047-b91d-ccde9c3c9a9e" /> |
+| <img src="https://github.com/user-attachments/assets/b540d98c-a37d-4cdb-a64c-74ba1b5fcf27" alt="Quiz" width="250"/> | <img src="https://github.com/user-attachments/assets/6f793d1c-387e-4db2-9407-6f5705392f1d" alt="Library" width="250"/> | <img src="https://github.com/user-attachments/assets/8e170e4b-f880-4047-b91d-ccde9c3c9a9e" alt="Edit" width="250"/> |
 
 ## 🛠 Tech Stack
 
