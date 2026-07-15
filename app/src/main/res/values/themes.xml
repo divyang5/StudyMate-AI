@@ -7,7 +7,8 @@
          Android 12 system splash to older API levels so every device behaves the same. -->
     <style name="Theme.StudyMateAI.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <!-- Vector logo: renders crisp at any size, unlike the old raster mipmaps. -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground_vector</item>
         <item name="postSplashScreenTheme">@style/Theme.StudyMateAI</item>
     </style>
 </resources>
