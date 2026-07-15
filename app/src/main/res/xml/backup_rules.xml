@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <exclude domain="sharedpref" path="com.google.firebase.auth.api.crypto.xml" />
+    <!-- Encrypted with an AndroidKeyStore master key that does not survive
+         backup/restore; a restored copy is undecryptable and crashed the app
+         at startup. Session data is re-synced from Firebase on login. -->
+    <exclude domain="sharedpref" path="studymate_session.xml" />
 </full-backup-content>

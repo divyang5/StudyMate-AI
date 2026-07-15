@@ -2,12 +2,14 @@ package com.divyang.studymateai.shredPrefs
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.divyang.studymateai.legal.TermsPolicy
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 class SharedPref(context: Context?) {
 
@@ -17,12 +19,28 @@ class SharedPref(context: Context?) {
         val appContext = requireNotNull(context) {
             "SharedPref requires a non-null Context"
         }.applicationContext
+        try {
+            createEncryptedPrefs(appContext)
+        } catch (e: Exception) {
+            // A backup/restore or reinstall can bring back the encrypted file
+            // while the Keystore master key that encrypted it is gone, making
+            // decryption fail (AEADBadTagException) on every launch. The file
+            // is unrecoverable: delete it and start fresh — the user just has
+            // to log in again instead of being stuck in a crash loop.
+            Log.e("SharedPref", "Encrypted prefs unreadable, resetting", e)
+            runCatching { FirebaseCrashlytics.getInstance().recordException(e) }
+            appContext.deleteSharedPreferences(PREF_FILE)
+            createEncryptedPrefs(appContext)
+        }
+    }
+
+    private fun createEncryptedPrefs(appContext: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(appContext)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
-        EncryptedSharedPreferences.create(
+        return EncryptedSharedPreferences.create(
             appContext,
-            "studymate_session",
+            PREF_FILE,
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
@@ -127,6 +145,8 @@ class SharedPref(context: Context?) {
     }
 
     private companion object {
+        const val PREF_FILE = "studymate_session"
+
         const val KEY_GEMINI_USER_KEY = "USER_GEMINI_API_KEY"
         const val KEY_QUOTA_DATE = "GEMINI_QUOTA_DATE"
         const val KEY_QUOTA_USED = "GEMINI_QUOTA_USED"
