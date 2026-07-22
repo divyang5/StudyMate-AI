@@ -23,8 +23,8 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="com.divyang.studymateai" />
-                  <option name="mobileSdkAppId" value="1:175485432781:android:406c33355645db38c48a84" />
+                  <option name="appId" value="com.divyang.studymateai.debug" />
+                  <option name="mobileSdkAppId" value="1:175485432781:android:9545f312d6976de5c48a84" />
                   <option name="projectId" value="studymate-ai-d788a" />
                   <option name="projectNumber" value="175485432781" />
                 </ConnectionSetting>

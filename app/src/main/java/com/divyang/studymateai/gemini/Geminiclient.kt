@@ -20,9 +20,9 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.gson.Gson
 import dagger.hilt.EntryPoint
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -169,7 +169,7 @@ class GeminiClient @Inject constructor(
 
     companion object {
         private const val TAG = "GeminiClient"
-        private const val MODEL_NAME = "gemini-3.5-flash"
+        private const val MODEL_NAME = "gemini-3.5-flash-lite"
 
         // Upper bound on user/OCR content embedded in a prompt. Caps Gemini cost and
         // blast radius; scanned chapters longer than this are truncated.
