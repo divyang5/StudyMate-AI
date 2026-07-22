@@ -48,7 +48,6 @@ import com.google.accompanist.pager.rememberPagerState
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import com.google.gson.Gson
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -200,7 +199,7 @@ fun FlashCardScreen(
                         description = "How many of the most important flashcards would you like to generate?",
                         itemLabel = "flashcards",
                         minValue = 5,
-                        maxValue = 25,
+                        maxValue = 30,
                         initialValue = flashcardCount.value,
                         isLoading = isLoadingFlashcards.value,
                         onConfirm = { count ->

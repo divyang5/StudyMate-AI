@@ -275,7 +275,7 @@ fun QuizGenerationScreen(
                         description = "How many questions would you like to generate?",
                         itemLabel = "questions",
                         minValue = 5,
-                        maxValue = 20,
+                        maxValue = 100,
                         initialValue = questionCount.value,
                         isLoading = isLoadingQuiz.value,
                         onConfirm = { count ->
